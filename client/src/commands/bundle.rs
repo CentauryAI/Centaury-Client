@@ -5,7 +5,9 @@
 //! server stores the blob and the refs stay provenance. Receivers on any
 //! machine get the full content with `bundle cat <id>`.
 
-use kore_protocol::bundle::{Bundle, BundleRefs, BundleSummary, CreateBundleRequest, CreateBundleResponse, TranscriptRange};
+use kore_protocol::bundle::{
+    Bundle, BundleRefs, BundleSummary, CreateBundleRequest, CreateBundleResponse, TranscriptRange,
+};
 
 use crate::{config, transcript};
 
@@ -45,25 +47,41 @@ pub enum BundleCmd {
 
 pub async fn run(cmd: BundleCmd) -> anyhow::Result<()> {
     match cmd {
-        BundleCmd::Create { title, description, files, transcript, events, extends } => {
-            create(title, description, files, transcript, events, extends).await
-        }
+        BundleCmd::Create {
+            title,
+            description,
+            files,
+            transcript,
+            events,
+            extends,
+        } => create(title, description, files, transcript, events, extends).await,
         BundleCmd::List { limit } => {
-            let list: Vec<BundleSummary> = crate::get_json(&format!("/v1/bundles?limit={limit}")).await?;
+            let list: Vec<BundleSummary> =
+                crate::get_json(&format!("/v1/bundles?limit={limit}")).await?;
             for b in list {
-                println!("{:<16} {:<28} {:<12} {:>7}B  {}", b.id, b.title, b.created_by, b.size, b.created_at);
+                println!(
+                    "{:<16} {:<28} {:<12} {:>7}B  {}",
+                    b.id, b.title, b.created_by, b.size, b.created_at
+                );
             }
             Ok(())
         }
         BundleCmd::Show { id } => {
             let b: Bundle = crate::get_json(&format!("/v1/bundles/{id}")).await?;
-            println!("{}  {}\nby {} at {}\n{}", b.id, b.title, b.created_by, b.created_at, b.description);
+            println!(
+                "{}  {}\nby {} at {}\n{}",
+                b.id, b.title, b.created_by, b.created_at, b.description
+            );
             if let Some(parent) = &b.extends {
                 println!("extends: {parent}");
             }
             println!(
                 "refs: {} file(s), {} event(s), {} transcript range(s) — `bundle cat {}` for the {}B content",
-                b.refs.files.len(), b.refs.events.len(), b.refs.transcript.len(), b.id, b.content.len()
+                b.refs.files.len(),
+                b.refs.events.len(),
+                b.refs.transcript.len(),
+                b.id,
+                b.content.len()
             );
             Ok(())
         }
@@ -98,7 +116,8 @@ async fn create(
 
     let mut content = String::new();
     for path in &refs.files {
-        let text = std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("cannot read '{path}': {e}"))?;
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("cannot read '{path}': {e}"))?;
         content.push_str(&format!("== file {path} ==\n{text}\n"));
     }
     if !refs.events.is_empty() {
@@ -116,7 +135,13 @@ async fn create(
         );
     }
 
-    let req = CreateBundleRequest { title, description, refs, content, extends };
+    let req = CreateBundleRequest {
+        title,
+        description,
+        refs,
+        content,
+        extends,
+    };
     let resp = config::http_client()
         .post(format!("{}/v1/bundles", config::server_url()))
         .bearer_auth(config::load_token()?)
@@ -124,10 +149,17 @@ async fn create(
         .send()
         .await?;
     if !resp.status().is_success() {
-        anyhow::bail!("bundle create failed ({}): {}", resp.status(), resp.text().await?);
+        anyhow::bail!(
+            "bundle create failed ({}): {}",
+            resp.status(),
+            resp.text().await?
+        );
     }
     let body: CreateBundleResponse = resp.json().await?;
-    println!("{}  — share it: kore-client send @who --bundle {} -- context ready", body.id, body.id);
+    println!(
+        "{}  — share it: kore-client send @who --bundle {} -- context ready",
+        body.id, body.id
+    );
     Ok(())
 }
 
@@ -148,11 +180,14 @@ fn parse_transcript_spec(spec: &str) -> anyhow::Result<Vec<TranscriptRange>> {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(|part| {
-            let (range, detail) = part
-                .split_once(':')
-                .ok_or_else(|| anyhow::anyhow!("transcript ref '{part}' needs range:detail, e.g. 3-14:normal"))?;
+            let (range, detail) = part.split_once(':').ok_or_else(|| {
+                anyhow::anyhow!("transcript ref '{part}' needs range:detail, e.g. 3-14:normal")
+            })?;
             parse_range(range)?; // fail early on garbage
-            Ok(TranscriptRange { range: range.to_string(), detail: detail.to_string() })
+            Ok(TranscriptRange {
+                range: range.to_string(),
+                detail: detail.to_string(),
+            })
         })
         .collect()
 }
@@ -160,8 +195,14 @@ fn parse_transcript_spec(spec: &str) -> anyhow::Result<Vec<TranscriptRange>> {
 /// "3-14" or "6" → inclusive 1-based bounds.
 fn parse_range(s: &str) -> anyhow::Result<(usize, usize)> {
     let (a, b) = s.split_once('-').unwrap_or((s, s));
-    let lo: usize = a.trim().parse().map_err(|_| anyhow::anyhow!("bad range '{s}'"))?;
-    let hi: usize = b.trim().parse().map_err(|_| anyhow::anyhow!("bad range '{s}'"))?;
+    let lo: usize = a
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("bad range '{s}'"))?;
+    let hi: usize = b
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("bad range '{s}'"))?;
     anyhow::ensure!(lo >= 1 && lo <= hi, "bad range '{s}'");
     Ok((lo, hi))
 }
@@ -181,7 +222,12 @@ fn materialize_transcript(ranges: &[TranscriptRange], out: &mut String) -> anyho
 
     for r in ranges {
         let (lo, hi) = parse_range(&r.range)?;
-        anyhow::ensure!(lo <= exchanges.len(), "range {} starts past the last exchange (#{})", r.range, exchanges.len());
+        anyhow::ensure!(
+            lo <= exchanges.len(),
+            "range {} starts past the last exchange (#{})",
+            r.range,
+            exchanges.len()
+        );
         out.push_str(&format!("== transcript {} ==\n", r.range));
         for ex in &exchanges[lo - 1..hi.min(exchanges.len())] {
             out.push_str(&format!("[{}] {}: {}\n", ex.ts, ex.role, ex.text));
@@ -198,16 +244,24 @@ async fn materialize_events(ids: &[String], out: &mut String) -> anyhow::Result<
         let (lo, hi) = parse_range(spec)?;
         wanted.extend(lo..=hi);
     }
-    let history: Vec<kore_protocol::api::Delivery> = crate::get_json("/v1/messages?limit=200").await?;
+    let history: Vec<kore_protocol::api::Delivery> =
+        crate::get_json("/v1/messages?limit=200").await?;
     for d in &history {
         if wanted.remove(&(d.id as usize)) {
-            out.push_str(&format!("== event #{} ==\n{}: {}\n\n", d.id, d.message.from, d.message.text));
+            out.push_str(&format!(
+                "== event #{} ==\n{}: {}\n\n",
+                d.id, d.message.from, d.message.text
+            ));
         }
     }
     anyhow::ensure!(
         wanted.is_empty(),
         "message id(s) not in your project's recent history: {}",
-        wanted.into_iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",")
+        wanted
+            .into_iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     );
     Ok(())
 }
@@ -226,8 +280,14 @@ mod tests {
 
         let spec = parse_transcript_spec("3-14:normal, 20:full").unwrap();
         assert_eq!(spec.len(), 2);
-        assert_eq!((spec[0].range.as_str(), spec[0].detail.as_str()), ("3-14", "normal"));
-        assert!(parse_transcript_spec("3-14").is_err(), "detail level required");
+        assert_eq!(
+            (spec[0].range.as_str(), spec[0].detail.as_str()),
+            ("3-14", "normal")
+        );
+        assert!(
+            parse_transcript_spec("3-14").is_err(),
+            "detail level required"
+        );
 
         assert_eq!(csv(&Some(" a, ,b ".into())), vec!["a", "b"]);
         assert!(csv(&None).is_empty());

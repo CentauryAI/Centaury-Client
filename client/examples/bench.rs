@@ -3,8 +3,8 @@
 //! Usage: bench <server-url> <token> <concurrency> <seconds> [message]
 //! Run the server with KORE_RATE_LIMIT=0 or the limiter will (correctly) say no.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 #[tokio::main]
@@ -59,7 +59,8 @@ async fn main() -> anyhow::Result<()> {
 
     let total = all.len();
     let errs = errors.load(Ordering::Relaxed);
-    let pct = |p: f64| all[((total as f64 * p) as usize).min(total.saturating_sub(1))] as f64 / 1000.0;
+    let pct =
+        |p: f64| all[((total as f64 * p) as usize).min(total.saturating_sub(1))] as f64 / 1000.0;
     println!(
         "requests={} errors={} rps={:.0} p50={:.1}ms p95={:.1}ms p99={:.1}ms max={:.1}ms",
         total,

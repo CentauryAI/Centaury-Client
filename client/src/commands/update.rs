@@ -32,7 +32,11 @@ fn parse(v: &str) -> (u64, u64, u64) {
             .parse()
             .unwrap_or(0)
     });
-    (it.next().unwrap_or(0), it.next().unwrap_or(0), it.next().unwrap_or(0))
+    (
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+    )
 }
 
 async fn latest_version(timeout: std::time::Duration) -> anyhow::Result<String> {
@@ -43,7 +47,13 @@ async fn latest_version(timeout: std::time::Duration) -> anyhow::Result<String> 
         .await?
         .error_for_status()?;
     // reqwest followed the redirect; the final URL's last segment is the tag.
-    let tag = resp.url().path().rsplit('/').next().unwrap_or_default().to_string();
+    let tag = resp
+        .url()
+        .path()
+        .rsplit('/')
+        .next()
+        .unwrap_or_default()
+        .to_string();
     if !tag.starts_with('v') {
         anyhow::bail!("no releases found for {REPO}");
     }
@@ -107,7 +117,11 @@ pub async fn print_hint() {
         .as_secs();
     let cached = std::fs::read_to_string(&path).ok();
     let latest = match cached.as_deref().and_then(|s| s.trim().split_once(' ')) {
-        Some((ts, v)) if ts.parse::<u64>().is_ok_and(|t| now.saturating_sub(t) < 86_400) => {
+        Some((ts, v))
+            if ts
+                .parse::<u64>()
+                .is_ok_and(|t| now.saturating_sub(t) < 86_400) =>
+        {
             v.to_string()
         }
         _ => {

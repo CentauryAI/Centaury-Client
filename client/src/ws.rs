@@ -73,8 +73,7 @@ pub async fn listen(timeout_secs: u64, json: bool) -> anyhow::Result<()> {
     }
     let start = std::time::Instant::now();
     quick_drain(json).await;
-    let remaining =
-        std::time::Duration::from_secs(timeout_secs).saturating_sub(start.elapsed());
+    let remaining = std::time::Duration::from_secs(timeout_secs).saturating_sub(start.elapsed());
     if remaining.is_zero() {
         return Ok(());
     }
@@ -89,7 +88,9 @@ pub async fn listen(timeout_secs: u64, json: bool) -> anyhow::Result<()> {
 /// the main loop to surface — this pass only guarantees the backlog check.
 async fn quick_drain(json: bool) {
     const IDLE_GAP: std::time::Duration = std::time::Duration::from_millis(300);
-    let Ok(mut ws) = connect(false).await else { return };
+    let Ok(mut ws) = connect(false).await else {
+        return;
+    };
     while let Ok(Ok(Some(d))) = tokio::time::timeout(IDLE_GAP, next_delivery(&mut ws)).await {
         emit_delivery(&d, json);
         let _ = send_ack(&mut ws, d.id).await; // after print (D12)

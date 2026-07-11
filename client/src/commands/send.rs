@@ -100,10 +100,15 @@ fn resolve_message_text(
     bare_words: Vec<String>,
     has_separator: bool,
 ) -> Result<String, String> {
-    let source_count = [has_separator, args.stdin, args.file.is_some(), args.base64.is_some()]
-        .iter()
-        .filter(|&&x| x)
-        .count();
+    let source_count = [
+        has_separator,
+        args.stdin,
+        args.file.is_some(),
+        args.base64.is_some(),
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
     if source_count > 1 {
         return Err("Only one of --, --stdin, --file, --base64 can be used".to_string());
     }
@@ -160,11 +165,13 @@ fn resolve_message_text(
 }
 
 pub async fn run(args: SendArgs) -> anyhow::Result<()> {
-    let (targets, bare_words) = process_positionals(&args.positionals).map_err(|e| anyhow::anyhow!(e))?;
+    let (targets, bare_words) =
+        process_positionals(&args.positionals).map_err(|e| anyhow::anyhow!(e))?;
     // clap's `last = true` can't distinguish `--` with nothing after it from no
     // `--` at all, so check the raw argv (the first `--` is always the separator).
     let has_separator = std::env::args().any(|a| a == "--");
-    let text = resolve_message_text(&args, bare_words, has_separator).map_err(|e| anyhow::anyhow!(e))?;
+    let text =
+        resolve_message_text(&args, bare_words, has_separator).map_err(|e| anyhow::anyhow!(e))?;
 
     // For --wait, open the peek socket *before* sending so a fast reply can't
     // slip through the gap. Peek never consumes the instance's real inbox.
@@ -218,12 +225,17 @@ pub async fn run(args: SendArgs) -> anyhow::Result<()> {
         .await;
 
         match reply {
-            Ok(Ok(Some(d))) => println!("reply #{} from {}: {}", d.id, d.message.from, d.message.text),
+            Ok(Ok(Some(d))) => println!(
+                "reply #{} from {}: {}",
+                d.id, d.message.from, d.message.text
+            ),
             Ok(Ok(None)) => anyhow::bail!("connection closed before a reply arrived"),
             Ok(Err(e)) => return Err(e),
             Err(_) => anyhow::bail!(
                 "no reply to #{} within {}s — recipient may answer later (kore-client send --reply-to {})",
-                body.id, args.timeout, body.id
+                body.id,
+                args.timeout,
+                body.id
             ),
         }
     }
@@ -285,7 +297,10 @@ mod tests {
     #[test]
     fn separator_text_wins_and_bare_words_before_it_error() {
         let a = args(&[], &["hello", "world"]);
-        assert_eq!(resolve_message_text(&a, vec![], true).unwrap(), "hello world");
+        assert_eq!(
+            resolve_message_text(&a, vec![], true).unwrap(),
+            "hello world"
+        );
         // `send luna -- hi`: silently dropping "luna" would broadcast.
         let err = resolve_message_text(&a, sv(&["luna"]), true).unwrap_err();
         assert!(err.contains("@luna"), "must suggest the @ form: {err}");

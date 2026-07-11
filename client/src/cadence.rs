@@ -49,7 +49,12 @@ pub fn parse_skill_spec(spec: &str) -> Result<SkillAssignment, String> {
             _ => return Err(format!("skill spec '{spec}': unknown segment '{seg}'")),
         }
     }
-    Ok(SkillAssignment { skill: name.to_string(), cadence_kind, cadence_value, inject_mode })
+    Ok(SkillAssignment {
+        skill: name.to_string(),
+        cadence_kind,
+        cadence_value,
+        inject_mode,
+    })
 }
 
 /// `"every=<N><msg|tok>"` → `(cadence_kind, N)`. N must be > 0.
@@ -64,7 +69,9 @@ fn parse_every(seg: &str) -> Result<(String, i64), String> {
     } else {
         return Err(format!("cadence '{seg}': unit must be 'msg' or 'tok'"));
     };
-    let value: i64 = num.parse().map_err(|_| format!("cadence '{seg}': bad number"))?;
+    let value: i64 = num
+        .parse()
+        .map_err(|_| format!("cadence '{seg}': bad number"))?;
     if value <= 0 {
         return Err(format!("cadence '{seg}': must be > 0"));
     }
@@ -87,13 +94,22 @@ mod tests {
         );
         let s = parse_skill_spec("tdd:every=8000tok:full").unwrap();
         assert_eq!(
-            (s.skill.as_str(), s.cadence_kind.as_str(), s.cadence_value, s.inject_mode.as_str()),
+            (
+                s.skill.as_str(),
+                s.cadence_kind.as_str(),
+                s.cadence_value,
+                s.inject_mode.as_str()
+            ),
             ("tdd", "tokens", 8000, "full")
         );
         // defaults + segment order independence
         let d = parse_skill_spec("tdd").unwrap();
         assert_eq!(
-            (d.cadence_kind.as_str(), d.cadence_value, d.inject_mode.as_str()),
+            (
+                d.cadence_kind.as_str(),
+                d.cadence_value,
+                d.inject_mode.as_str()
+            ),
             ("messages", 15, "pointer")
         );
         let r = parse_skill_spec("tdd:full:every=5msg").unwrap();

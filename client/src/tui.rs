@@ -11,9 +11,7 @@
 use std::collections::HashSet;
 use std::sync::mpsc as std_mpsc;
 
-use crossterm::event::{
-    Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use kore_protocol::api::{Delivery, InstanceSummary};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -234,7 +232,9 @@ impl Theme {
         Style::default().fg(self.pal().fg_dark)
     }
     fn title(&self) -> Style {
-        Style::default().fg(self.pal().blue).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.pal().blue)
+            .add_modifier(Modifier::BOLD)
     }
 }
 
@@ -276,7 +276,15 @@ const MAX_FEED: usize = 500;
 
 // ---- Tab launch form (legacy tui/render/launch.rs feel) ----
 
-const TOOLS: [&str; 7] = ["claude", "codex", "gemini", "antigravity", "opencode", "kilo", "cline"];
+const TOOLS: [&str; 7] = [
+    "claude",
+    "codex",
+    "gemini",
+    "antigravity",
+    "opencode",
+    "kilo",
+    "cline",
+];
 // "split" divides the terminal the TUI runs in (legacy behavior); the rest
 // open a new window. launch errors if the current terminal can't split.
 const TERMINALS: [&str; 6] = ["split", "auto", "kitty", "wezterm", "tmux", "foot"];
@@ -342,7 +350,11 @@ impl LaunchForm {
 
     /// The detached `kore-client launch ...` argv this form describes.
     fn argv(&self) -> Vec<String> {
-        let mut v = vec!["launch".to_string(), "--tool".into(), TOOLS[self.tool].into()];
+        let mut v = vec![
+            "launch".to_string(),
+            "--tool".into(),
+            TOOLS[self.tool].into(),
+        ];
         // Tag = legacy group label, NOT the agent's name: names stay random,
         // the tag is a separate column shown as "{tag}-{name}".
         if !self.tag.is_empty() {
@@ -443,7 +455,10 @@ async fn login_wizard() -> anyhow::Result<()> {
 
 /// Tokio side: initial roster+history, periodic roster refresh, live WS feed,
 /// and sends. Every outcome goes to the UI as a UiEvent — no printing.
-async fn net_task(ui_tx: std_mpsc::Sender<UiEvent>, mut cmd_rx: tokio_mpsc::UnboundedReceiver<Cmd>) {
+async fn net_task(
+    ui_tx: std_mpsc::Sender<UiEvent>,
+    mut cmd_rx: tokio_mpsc::UnboundedReceiver<Cmd>,
+) {
     let send_event = |e| {
         let _ = ui_tx.send(e);
     };
@@ -459,8 +474,12 @@ async fn net_task(ui_tx: std_mpsc::Sender<UiEvent>, mut cmd_rx: tokio_mpsc::Unbo
 
     // Once at startup: the org's projects feed the launch form's select.
     // ponytail: no refresh — reopen the TUI if a project was created mid-session.
-    if let Ok(list) = crate::get_json::<Vec<kore_protocol::api::ProjectSummary>>("/v1/projects").await {
-        send_event(UiEvent::Projects(list.into_iter().map(|p| p.name).collect()));
+    if let Ok(list) =
+        crate::get_json::<Vec<kore_protocol::api::ProjectSummary>>("/v1/projects").await
+    {
+        send_event(UiEvent::Projects(
+            list.into_iter().map(|p| p.name).collect(),
+        ));
     }
 
     let mut roster_tick = tokio::time::interval(ROSTER_REFRESH);
@@ -524,13 +543,19 @@ async fn do_send(text: String) -> UiEvent {
         .send()
         .await;
     match resp {
-        Ok(r) if r.status().is_success() => match r.json::<kore_protocol::api::SendResponse>().await {
-            Ok(body) => UiEvent::Info(format!("sent #{} [{}]", body.id, body.scope.as_str())),
-            Err(e) => UiEvent::Error(format!("send: {e}")),
-        },
+        Ok(r) if r.status().is_success() => {
+            match r.json::<kore_protocol::api::SendResponse>().await {
+                Ok(body) => UiEvent::Info(format!("sent #{} [{}]", body.id, body.scope.as_str())),
+                Err(e) => UiEvent::Error(format!("send: {e}")),
+            }
+        }
         Ok(r) => {
             let status = r.status();
-            UiEvent::Error(format!("send {}: {}", status, r.text().await.unwrap_or_default()))
+            UiEvent::Error(format!(
+                "send {}: {}",
+                status,
+                r.text().await.unwrap_or_default()
+            ))
         }
         Err(e) => UiEvent::Error(format!("send: {e}")),
     }
@@ -543,7 +568,10 @@ async fn do_kill(name: String) -> UiEvent {
         Err(e) => return UiEvent::Error(e.to_string()),
     };
     let resp = config::http_client()
-        .delete(format!("{}/v1/instances/{name}?kill=true", config::server_url()))
+        .delete(format!(
+            "{}/v1/instances/{name}?kill=true",
+            config::server_url()
+        ))
         .bearer_auth(token)
         .send()
         .await;
@@ -554,7 +582,11 @@ async fn do_kill(name: String) -> UiEvent {
         }
         Ok(r) => {
             let status = r.status();
-            UiEvent::Error(format!("kill {}: {}", status, r.text().await.unwrap_or_default()))
+            UiEvent::Error(format!(
+                "kill {}: {}",
+                status,
+                r.text().await.unwrap_or_default()
+            ))
         }
         Err(e) => UiEvent::Error(format!("kill: {e}")),
     }
@@ -580,7 +612,11 @@ async fn do_retag(name: String, tag: Option<String>) -> UiEvent {
         },
         Ok(r) => {
             let status = r.status();
-            UiEvent::Error(format!("retag {}: {}", status, r.text().await.unwrap_or_default()))
+            UiEvent::Error(format!(
+                "retag {}: {}",
+                status,
+                r.text().await.unwrap_or_default()
+            ))
         }
         Err(e) => UiEvent::Error(format!("retag: {e}")),
     }
@@ -643,7 +679,10 @@ fn ui_loop_inner(
         cursor: 0,
         selected: HashSet::new(),
         overlay: Overlay::None,
-        theme: Theme { pal_i: 0, style_i: 0 },
+        theme: Theme {
+            pal_i: 0,
+            style_i: 0,
+        },
         layout_i: 0,
     };
     let mut dirty = true;
@@ -869,7 +908,8 @@ fn body_outer(area: Rect, ui: &Ui) -> (Rect, Rect, Option<Rect>) {
     let bordered = ui.theme.gl().border != BorderKind::None;
     let a_w = if bordered { 30 } else { 26 };
     let f_min = if bordered { 22 } else { 20 };
-    let split = |dir, c: Vec<Constraint>| Layout::default().direction(dir).constraints(c).split(area);
+    let split =
+        |dir, c: Vec<Constraint>| Layout::default().direction(dir).constraints(c).split(area);
     use Constraint::{Length, Min};
     match LAYOUTS[ui.layout_i].0 {
         LayoutKind::SidebarLeft if bordered => {
@@ -877,7 +917,10 @@ fn body_outer(area: Rect, ui: &Ui) -> (Rect, Rect, Option<Rect>) {
             (c[0], c[1], None)
         }
         LayoutKind::SidebarLeft => {
-            let c = split(Direction::Horizontal, vec![Length(a_w), Length(1), Min(f_min)]);
+            let c = split(
+                Direction::Horizontal,
+                vec![Length(a_w), Length(1), Min(f_min)],
+            );
             (c[0], c[2], Some(c[1]))
         }
         LayoutKind::SidebarRight if bordered => {
@@ -885,7 +928,10 @@ fn body_outer(area: Rect, ui: &Ui) -> (Rect, Rect, Option<Rect>) {
             (c[1], c[0], None)
         }
         LayoutKind::SidebarRight => {
-            let c = split(Direction::Horizontal, vec![Min(f_min), Length(1), Length(a_w)]);
+            let c = split(
+                Direction::Horizontal,
+                vec![Min(f_min), Length(1), Length(a_w)],
+            );
             (c[2], c[0], Some(c[1]))
         }
         // ponytail: agents strip fixed height; a long roster clips — add a
@@ -1000,7 +1046,11 @@ fn self_or_selected(ui: &Ui) -> Vec<String> {
         vec![ui.roster[ui.cursor].name.clone()]
     } else {
         // Keep roster order for a stable prompt.
-        ui.roster.iter().map(|i| i.name.clone()).filter(|n| ui.selected.contains(n)).collect()
+        ui.roster
+            .iter()
+            .map(|i| i.name.clone())
+            .filter(|n| ui.selected.contains(n))
+            .collect()
     }
 }
 
@@ -1028,7 +1078,11 @@ fn handle_overlay_key(code: KeyCode, ui: &mut Ui, cmd_tx: &tokio_mpsc::Unbounded
                 buf.pop();
             }
             KeyCode::Enter => {
-                let tag = if buf.trim().is_empty() { None } else { Some(buf.trim().to_string()) };
+                let tag = if buf.trim().is_empty() {
+                    None
+                } else {
+                    Some(buf.trim().to_string())
+                };
                 for name in targets.drain(..) {
                     let _ = cmd_tx.send(Cmd::Retag(name, tag.clone()));
                 }
@@ -1076,10 +1130,13 @@ fn run_form_launch(form: &LaunchForm) -> String {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| "kore-client".into());
     match std::process::Command::new(exe).args(form.argv()).output() {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().replace('\n', " · ")
-        }
-        Ok(out) => format!("launch failed: {}", String::from_utf8_lossy(&out.stderr).trim()),
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+            .trim()
+            .replace('\n', " · "),
+        Ok(out) => format!(
+            "launch failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ),
         Err(e) => format!("launch failed: {e}"),
     }
 }
@@ -1128,7 +1185,8 @@ fn launch_note(name: &str, project: Option<&str>) -> String {
     if let Some(p) = project {
         cmd.args(["--project", p]);
     }
-    cmd.stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    cmd.stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     match cmd.spawn() {
         Ok(_) => format!("launching '{name}' in a new terminal window"),
         Err(e) => format!("launch failed: {e}"),
@@ -1161,7 +1219,10 @@ mod tests {
             cursor: 0,
             selected: HashSet::new(),
             overlay: Overlay::None,
-            theme: Theme { pal_i: 0, style_i: 0 },
+            theme: Theme {
+                pal_i: 0,
+                style_i: 0,
+            },
             layout_i: 0,
         }
     }
@@ -1208,8 +1269,14 @@ mod tests {
     #[test]
     fn cycle_mention_replaces_leading_target_only() {
         assert_eq!(cycle_mention("", "luna"), "@luna ");
-        assert_eq!(cycle_mention("fix the build", "luna"), "@luna fix the build");
-        assert_eq!(cycle_mention("@luna fix the build", "nova"), "@nova fix the build");
+        assert_eq!(
+            cycle_mention("fix the build", "luna"),
+            "@luna fix the build"
+        );
+        assert_eq!(
+            cycle_mention("@luna fix the build", "nova"),
+            "@nova fix the build"
+        );
         assert_eq!(cycle_mention("@luna", "nova"), "@nova ");
     }
 
@@ -1235,11 +1302,23 @@ mod tests {
         let argv = f.argv();
         assert_eq!(
             argv,
-            ["launch", "--tool", "cline", "--tag", "team", "--count", "3", "--headless"]
+            [
+                "launch",
+                "--tool",
+                "cline",
+                "--tag",
+                "team",
+                "--count",
+                "3",
+                "--headless"
+            ]
         );
         f.headless = false;
         // default terminal option is "split" — divide the TUI's own terminal
-        assert!(f.argv().ends_with(&["--terminal".to_string(), "split".to_string()]));
+        assert!(
+            f.argv()
+                .ends_with(&["--terminal".to_string(), "split".to_string()])
+        );
 
         // Project/Owner are SELECTS: index 0 = defaults (nothing in argv);
         // cycling to a real entry rides into the argv; free text is impossible.
@@ -1248,7 +1327,10 @@ mod tests {
         assert!(f.argv().contains(&"research".to_string()));
         f.field = 6;
         f.cycle(1);
-        assert!(f.argv().ends_with(&["--owner".to_string(), "boss".to_string()]));
+        assert!(
+            f.argv()
+                .ends_with(&["--owner".to_string(), "boss".to_string()])
+        );
         f.cycle(1); // wraps back to "you" → --owner gone (server default = caller)
         assert!(!f.argv().iter().any(|a| a == "--owner"));
     }
@@ -1259,7 +1341,10 @@ mod tests {
         assert_eq!(PALETTES.len(), 4);
         assert_eq!(STYLES.len(), 3);
         assert_eq!(LAYOUTS.len(), 3);
-        let th = Theme { pal_i: PALETTES.len() - 1, style_i: STYLES.len() - 1 };
+        let th = Theme {
+            pal_i: PALETTES.len() - 1,
+            style_i: STYLES.len() - 1,
+        };
         assert_eq!(th.pal().name, "light");
         assert_eq!(th.gl().name, "ascii");
         assert_eq!(th.gl().border, BorderKind::Ascii);
@@ -1276,8 +1361,14 @@ mod tests {
                 ui.theme.style_i = style_i;
                 ui.layout_i = layout_i;
                 let (a, fd) = agents_feed_rects(area, &ui);
-                assert!(a.width > 0 && a.height > 0, "empty agents {style_i}/{layout_i}");
-                assert!(fd.width > 0 && fd.height > 0, "empty feed {style_i}/{layout_i}");
+                assert!(
+                    a.width > 0 && a.height > 0,
+                    "empty agents {style_i}/{layout_i}"
+                );
+                assert!(
+                    fd.width > 0 && fd.height > 0,
+                    "empty feed {style_i}/{layout_i}"
+                );
                 let disjoint = a.x + a.width <= fd.x
                     || fd.x + fd.width <= a.x
                     || a.y + a.height <= fd.y
@@ -1333,11 +1424,15 @@ fn draw_body(f: &mut ratatui::Frame, area: ratatui::layout::Rect, me: &str, ui: 
 /// horizontal rule for the stacked layout (height 1).
 fn draw_sep(f: &mut ratatui::Frame, s: Rect, th: &Theme) {
     let para = if s.width <= s.height {
-        let lines: Vec<Line> =
-            (0..s.height).map(|_| Line::from(Span::styled(th.gl().sep, th.dark()))).collect();
+        let lines: Vec<Line> = (0..s.height)
+            .map(|_| Line::from(Span::styled(th.gl().sep, th.dark())))
+            .collect();
         Paragraph::new(lines)
     } else {
-        Paragraph::new(Line::from(Span::styled(th.gl().hsep.repeat(s.width as usize), th.dark())))
+        Paragraph::new(Line::from(Span::styled(
+            th.gl().hsep.repeat(s.width as usize),
+            th.dark(),
+        )))
     };
     f.render_widget(para.style(th.base()), s);
 }
@@ -1348,7 +1443,10 @@ fn panel_block(th: &Theme, title: &str, active: bool) -> Block<'static> {
         .borders(Borders::ALL)
         .style(th.base())
         .border_style(if active { th.title() } else { th.dark() })
-        .title(Span::styled(format!(" {title} "), if active { th.title() } else { th.dim() }));
+        .title(Span::styled(
+            format!(" {title} "),
+            if active { th.title() } else { th.dim() },
+        ));
     b = match th.gl().border {
         BorderKind::Rounded => b.border_type(BorderType::Rounded),
         BorderKind::Ascii => b.border_set(ASCII_BORDER),
@@ -1366,20 +1464,35 @@ fn draw_status_bar(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui)
         Span::raw("  "),
         Span::styled("kore", th.title()),
         Span::raw("  "),
-        Span::styled(format!("{} {active}", th.gl().active), Style::default().fg(th.pal().green)),
+        Span::styled(
+            format!("{} {active}", th.gl().active),
+            Style::default().fg(th.pal().green),
+        ),
         Span::styled(" active  ", th.dark()),
         Span::styled(format!("{} {idle}", th.gl().idle), th.dim()),
         Span::styled(" idle", th.dark()),
     ];
     if let Some(t) = &ui.thread_filter {
-        spans.push(Span::styled(format!("  thread:{t}"), Style::default().fg(th.pal().yellow)));
+        spans.push(Span::styled(
+            format!("  thread:{t}"),
+            Style::default().fg(th.pal().yellow),
+        ));
     }
     if ui.scroll > 0 {
-        spans.push(Span::styled(format!("  {}{}", th.gl().up, ui.scroll), Style::default().fg(th.pal().orange)));
+        spans.push(Span::styled(
+            format!("  {}{}", th.gl().up, ui.scroll),
+            Style::default().fg(th.pal().orange),
+        ));
     }
     // Theme readout, right-ish: palette/style/layout, dim.
     spans.push(Span::styled(
-        format!("   {} {}/{}/{}", th.gl().bullet, th.pal().name, th.gl().name, LAYOUTS[ui.layout_i].1),
+        format!(
+            "   {} {}/{}/{}",
+            th.gl().bullet,
+            th.pal().name,
+            th.gl().name,
+            LAYOUTS[ui.layout_i].1
+        ),
         th.dark(),
     ));
     f.render_widget(Paragraph::new(Line::from(spans)).style(th.base()), area);
@@ -1413,10 +1526,16 @@ fn draw_agents(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui) {
             ),
         ];
         if selected {
-            spans.push(Span::styled(format!(" {}", th.gl().check), Style::default().fg(th.pal().cyan)));
+            spans.push(Span::styled(
+                format!(" {}", th.gl().check),
+                Style::default().fg(th.pal().cyan),
+            ));
         }
         if i.kind == "human" {
-            spans.push(Span::styled(format!(" {}", th.gl().human), Style::default().fg(th.pal().magenta)));
+            spans.push(Span::styled(
+                format!(" {}", th.gl().human),
+                Style::default().fg(th.pal().magenta),
+            ));
         } else if let Some(t) = &i.tool {
             spans.push(Span::styled(format!(" {t}"), th.dark()));
         }
@@ -1456,10 +1575,17 @@ fn draw_feed(f: &mut ratatui::Frame, area: ratatui::layout::Rect, me: &str, ui: 
         .rev()
         .map(|l| match *l {
             FeedLine::Msg(d) => {
-                let sender = if d.message.from == me { th.pal().blue } else { th.pal().cyan };
+                let sender = if d.message.from == me {
+                    th.pal().blue
+                } else {
+                    th.pal().cyan
+                };
                 let mut spans = vec![
                     Span::styled(format!("#{:<4} ", d.id), th.dark()),
-                    Span::styled(d.message.from.clone(), Style::default().fg(sender).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        d.message.from.clone(),
+                        Style::default().fg(sender).add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled("  ", th.dark()),
                 ];
                 spans.extend(mention_spans(&d.message.text, th));
@@ -1471,13 +1597,20 @@ fn draw_feed(f: &mut ratatui::Frame, area: ratatui::layout::Rect, me: &str, ui: 
             ]),
         })
         .collect();
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).style(th.base()), area);
+    f.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .style(th.base()),
+        area,
+    );
 }
 
 /// Highlight @mentions in the theme's orange.
 fn mention_spans(text: &str, th: &Theme) -> Vec<Span<'static>> {
     let fg = Style::default().fg(th.pal().fg);
-    let mention = Style::default().fg(th.pal().orange).add_modifier(Modifier::BOLD);
+    let mention = Style::default()
+        .fg(th.pal().orange)
+        .add_modifier(Modifier::BOLD);
     text.split_inclusive(' ')
         .map(|w| {
             if w.starts_with('@') && w.len() > 1 {
@@ -1499,7 +1632,12 @@ fn draw_overlay_row(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui
         Overlay::Confirm(targets) => {
             f.render_widget(
                 Paragraph::new(Line::from(vec![
-                    Span::styled("  kill ", Style::default().fg(th.pal().orange).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "  kill ",
+                        Style::default()
+                            .fg(th.pal().orange)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(targets.join(", "), Style::default().fg(th.pal().fg)),
                     Span::styled("  (y/n)", th.dim()),
                 ]))
@@ -1510,7 +1648,12 @@ fn draw_overlay_row(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui
         Overlay::Retag(targets, buf) => {
             f.render_widget(
                 Paragraph::new(Line::from(vec![
-                    Span::styled("  tag ", Style::default().fg(th.pal().yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "  tag ",
+                        Style::default()
+                            .fg(th.pal().yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(targets.join(", "), th.dim()),
                     Span::styled(": ", th.dark()),
                     Span::styled(buf.clone(), Style::default().fg(th.pal().fg)),
@@ -1523,10 +1666,17 @@ fn draw_overlay_row(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui
         }
         Overlay::None => {
             // Roster focus dims the prompt so focus is obvious.
-            let caret_fg = if ui.focus == Focus::Input { th.pal().blue } else { th.pal().fg_dark };
+            let caret_fg = if ui.focus == Focus::Input {
+                th.pal().blue
+            } else {
+                th.pal().fg_dark
+            };
             f.render_widget(
                 Paragraph::new(Line::from(vec![
-                    Span::styled(format!("  {} ", th.gl().caret), Style::default().fg(caret_fg)),
+                    Span::styled(
+                        format!("  {} ", th.gl().caret),
+                        Style::default().fg(caret_fg),
+                    ),
                     Span::styled(ui.input.clone(), Style::default().fg(th.pal().fg)),
                     Span::styled(th.gl().block, Style::default().fg(caret_fg)),
                 ]))
@@ -1621,7 +1771,10 @@ fn footer_spans_hits(ui: &Ui) -> (Vec<Span<'static>>, Vec<(u16, u16, KeyCode, Ke
 /// Key hints, contextual to focus/overlay — clickable (see `footer_items`).
 fn draw_footer(f: &mut ratatui::Frame, area: ratatui::layout::Rect, ui: &Ui) {
     let (spans, _) = footer_spans_hits(ui);
-    f.render_widget(Paragraph::new(Line::from(spans)).style(ui.theme.base()), area);
+    f.render_widget(
+        Paragraph::new(Line::from(spans)).style(ui.theme.base()),
+        area,
+    );
 }
 
 /// The `label  value` form rows, selected row on SELECTION bg with a caret.
@@ -1635,10 +1788,29 @@ fn form_lines(form: &LaunchForm, th: &Theme) -> Vec<Line<'static>> {
         ("Tool", TOOLS[form.tool].to_string()),
         ("Count", form.count.to_string()),
         ("Tag", tag),
-        ("Headless", if form.headless { th.gl().check.to_string() } else { " ".into() }),
+        (
+            "Headless",
+            if form.headless {
+                th.gl().check.to_string()
+            } else {
+                " ".into()
+            },
+        ),
         ("Terminal", TERMINALS[form.terminal].to_string()),
-        ("Project", form.projects.get(form.project_i).cloned().unwrap_or_else(|| "(current)".into())),
-        ("Owner", form.owners.get(form.owner_i).cloned().unwrap_or_else(|| "you".into())),
+        (
+            "Project",
+            form.projects
+                .get(form.project_i)
+                .cloned()
+                .unwrap_or_else(|| "(current)".into()),
+        ),
+        (
+            "Owner",
+            form.owners
+                .get(form.owner_i)
+                .cloned()
+                .unwrap_or_else(|| "you".into()),
+        ),
     ];
     let mut lines = vec![Line::from(vec![
         Span::styled("  ── ", th.dark()),
@@ -1647,12 +1819,26 @@ fn form_lines(form: &LaunchForm, th: &Theme) -> Vec<Line<'static>> {
     ])];
     lines.extend(rows.into_iter().enumerate().map(|(i, (label, value))| {
         let selected = i == form.field;
-        let cursor = if selected { format!("{} ", th.gl().caret) } else { "  ".into() };
+        let cursor = if selected {
+            format!("{} ", th.gl().caret)
+        } else {
+            "  ".into()
+        };
         let mut line = Line::from(vec![
             Span::raw("  "),
             Span::styled(cursor, Style::default().fg(th.pal().blue)),
-            Span::styled(format!("{label:<9}"), if selected { Style::default().fg(th.pal().fg) } else { th.dim() }),
-            Span::styled(value, Style::default().fg(if selected { th.pal().cyan } else { th.pal().fg })),
+            Span::styled(
+                format!("{label:<9}"),
+                if selected {
+                    Style::default().fg(th.pal().fg)
+                } else {
+                    th.dim()
+                },
+            ),
+            Span::styled(
+                value,
+                Style::default().fg(if selected { th.pal().cyan } else { th.pal().fg }),
+            ),
         ]);
         if selected {
             line = line.style(Style::default().bg(th.pal().selection));

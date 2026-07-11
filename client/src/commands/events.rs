@@ -61,11 +61,28 @@ pub async fn run(args: EventsArgs) -> anyhow::Result<()> {
                 println!("no events");
             }
             for e in events {
-                println!("#{:<6} {:<27} {:<7} {:<16} {}", e.id, e.timestamp, e.r#type, e.instance, summary(&e.data));
+                println!(
+                    "#{:<6} {:<27} {:<7} {:<16} {}",
+                    e.id,
+                    e.timestamp,
+                    e.r#type,
+                    e.instance,
+                    summary(&e.data)
+                );
             }
         }
-        Some(EventsSubcmd::Sub { event_type, agent, action, once }) => {
-            let req = CreateEventSubRequest { event_type, instance: agent, action, once };
+        Some(EventsSubcmd::Sub {
+            event_type,
+            agent,
+            action,
+            once,
+        }) => {
+            let req = CreateEventSubRequest {
+                event_type,
+                instance: agent,
+                action,
+                once,
+            };
             let resp = config::http_client()
                 .post(format!("{}/v1/events/subs", config::server_url()))
                 .bearer_auth(config::load_token()?)
@@ -73,10 +90,17 @@ pub async fn run(args: EventsArgs) -> anyhow::Result<()> {
                 .send()
                 .await?;
             if !resp.status().is_success() {
-                anyhow::bail!("subscribe failed ({}): {}", resp.status(), resp.text().await?);
+                anyhow::bail!(
+                    "subscribe failed ({}): {}",
+                    resp.status(),
+                    resp.text().await?
+                );
             }
             let created: CreateEventSubResponse = resp.json().await?;
-            println!("subscribed: {} — you'll get a kore message when it fires", created.id);
+            println!(
+                "subscribed: {} — you'll get a kore message when it fires",
+                created.id
+            );
         }
         Some(EventsSubcmd::Subs) => {
             let subs: Vec<EventSubInfo> = crate::get_json("/v1/events/subs").await?;
@@ -113,8 +137,15 @@ pub async fn run(args: EventsArgs) -> anyhow::Result<()> {
 /// One-line human summary of an event's data payload.
 fn summary(data: &serde_json::Value) -> String {
     if let Some(action) = data.get("action").and_then(|v| v.as_str()) {
-        let killed = data.get("killed").and_then(|v| v.as_bool()).unwrap_or(false);
-        return if killed { format!("{action} (killed)") } else { action.to_string() };
+        let killed = data
+            .get("killed")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        return if killed {
+            format!("{action} (killed)")
+        } else {
+            action.to_string()
+        };
     }
     if let Some(ctx) = data.get("context").and_then(|v| v.as_str()) {
         return format!("→ \"{ctx}\"");
@@ -128,8 +159,17 @@ mod tests {
 
     #[test]
     fn summary_covers_all_event_shapes() {
-        assert_eq!(summary(&serde_json::json!({"action": "created", "kind": "agent"})), "created");
-        assert_eq!(summary(&serde_json::json!({"action": "stopped", "killed": true})), "stopped (killed)");
-        assert_eq!(summary(&serde_json::json!({"context": "reviewing PR"})), "→ \"reviewing PR\"");
+        assert_eq!(
+            summary(&serde_json::json!({"action": "created", "kind": "agent"})),
+            "created"
+        );
+        assert_eq!(
+            summary(&serde_json::json!({"action": "stopped", "killed": true})),
+            "stopped (killed)"
+        );
+        assert_eq!(
+            summary(&serde_json::json!({"context": "reviewing PR"})),
+            "→ \"reviewing PR\""
+        );
     }
 }

@@ -17,7 +17,9 @@ use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
-    schemars, service::RequestContext, tool, tool_handler, tool_router,
+    schemars,
+    service::RequestContext,
+    tool, tool_handler, tool_router,
     transport::stdio,
 };
 
@@ -57,7 +59,9 @@ pub struct Kore {
 
 impl Kore {
     pub fn new() -> Self {
-        Self { tool_router: Self::tool_router() }
+        Self {
+            tool_router: Self::tool_router(),
+        }
     }
 }
 
@@ -98,7 +102,9 @@ struct WaitParams {
 
 #[tool_router]
 impl Kore {
-    #[tool(description = "Send a message to agents/humans in your kore project. `to` = names without '@' (empty = broadcast to everyone). Returns the sent message id.")]
+    #[tool(
+        description = "Send a message to agents/humans in your kore project. `to` = names without '@' (empty = broadcast to everyone). Returns the sent message id."
+    )]
     async fn kore_send(&self, Parameters(p): Parameters<SendParams>) -> Result<String, McpError> {
         let token = config::load_token().map_err(err)?;
         let resp = config::http_client()
@@ -118,18 +124,27 @@ impl Kore {
             .map_err(err)?;
         if !resp.status().is_success() {
             let st = resp.status();
-            return Err(err(format!("send failed ({st}): {}", resp.text().await.unwrap_or_default())));
+            return Err(err(format!(
+                "send failed ({st}): {}",
+                resp.text().await.unwrap_or_default()
+            )));
         }
         let body: kore_protocol::api::SendResponse = resp.json().await.map_err(err)?;
         Ok(format!(
             "sent #{} [{}]{}",
             body.id,
             body.scope.as_str(),
-            if body.mentions.is_empty() { String::new() } else { format!(" → @{}", body.mentions.join(", @")) }
+            if body.mentions.is_empty() {
+                String::new()
+            } else {
+                format!(" → @{}", body.mentions.join(", @"))
+            }
         ))
     }
 
-    #[tool(description = "List everyone in your kore project (the roster): who is online, their kind (agent/human), owner, and current status.")]
+    #[tool(
+        description = "List everyone in your kore project (the roster): who is online, their kind (agent/human), owner, and current status."
+    )]
     async fn kore_list(&self) -> Result<String, McpError> {
         let instances: Vec<kore_protocol::api::InstanceSummary> =
             crate::get_json("/v1/instances").await.map_err(err)?;
@@ -158,10 +173,15 @@ impl Kore {
     }
 
     #[tool(description = "Fetch recent message history in your kore project (oldest first).")]
-    async fn kore_history(&self, Parameters(p): Parameters<HistoryParams>) -> Result<String, McpError> {
+    async fn kore_history(
+        &self,
+        Parameters(p): Parameters<HistoryParams>,
+    ) -> Result<String, McpError> {
         let limit = p.limit.unwrap_or(20).clamp(1, 200);
         let msgs: Vec<kore_protocol::api::Delivery> =
-            crate::get_json(&format!("/v1/messages?limit={limit}")).await.map_err(err)?;
+            crate::get_json(&format!("/v1/messages?limit={limit}"))
+                .await
+                .map_err(err)?;
         if msgs.is_empty() {
             return Ok("no messages yet".to_string());
         }
@@ -172,29 +192,48 @@ impl Kore {
             } else {
                 format!("@{}", d.message.mentions.join(", @"))
             };
-            out.push_str(&format!("#{} {} → {}: {}\n", d.id, d.message.from, to, d.message.text));
+            out.push_str(&format!(
+                "#{} {} → {}: {}\n",
+                d.id, d.message.from, to, d.message.text
+            ));
         }
         Ok(out)
     }
 
-    #[tool(description = "Set your own status — a short 'what I'm doing now' others see in the roster.")]
-    async fn kore_status(&self, Parameters(p): Parameters<StatusParams>) -> Result<String, McpError> {
+    #[tool(
+        description = "Set your own status — a short 'what I'm doing now' others see in the roster."
+    )]
+    async fn kore_status(
+        &self,
+        Parameters(p): Parameters<StatusParams>,
+    ) -> Result<String, McpError> {
         let token = config::load_token().map_err(err)?;
         let resp = config::http_client()
             .patch(format!("{}/v1/instances/self", config::server_url()))
             .bearer_auth(token)
-            .json(&kore_protocol::api::SetStatusRequest { status_context: p.text.clone() })
+            .json(&kore_protocol::api::SetStatusRequest {
+                status_context: p.text.clone(),
+            })
             .send()
             .await
             .map_err(err)?;
         if !resp.status().is_success() {
             let st = resp.status();
-            return Err(err(format!("status failed ({st}): {}", resp.text().await.unwrap_or_default())));
+            return Err(err(format!(
+                "status failed ({st}): {}",
+                resp.text().await.unwrap_or_default()
+            )));
         }
-        Ok(if p.text.is_empty() { "status cleared".to_string() } else { format!("status set: {}", p.text) })
+        Ok(if p.text.is_empty() {
+            "status cleared".to_string()
+        } else {
+            format!("status set: {}", p.text)
+        })
     }
 
-    #[tool(description = "Non-blocking: how many messages are waiting for you right now. Use kore_wait to actually receive them.")]
+    #[tool(
+        description = "Non-blocking: how many messages are waiting for you right now. Use kore_wait to actually receive them."
+    )]
     async fn kore_check(&self) -> Result<String, McpError> {
         let u: kore_protocol::api::UnreadResponse =
             crate::get_json("/v1/messages/unread").await.map_err(err)?;
@@ -204,7 +243,9 @@ impl Kore {
         })
     }
 
-    #[tool(description = "Block until a message arrives (or timeout), then return it and mark it read. THIS IS HOW YOU RECEIVE — nothing is pushed to you. Call it again after handling messages to keep listening.")]
+    #[tool(
+        description = "Block until a message arrives (or timeout), then return it and mark it read. THIS IS HOW YOU RECEIVE — nothing is pushed to you. Call it again after handling messages to keep listening."
+    )]
     async fn kore_wait(
         &self,
         Parameters(p): Parameters<WaitParams>,
@@ -258,7 +299,10 @@ impl Kore {
 
         let mut out = String::new();
         for d in &msgs {
-            out.push_str(&format!("#{} {}: {}\n", d.id, d.message.from, d.message.text));
+            out.push_str(&format!(
+                "#{} {}: {}\n",
+                d.id, d.message.from, d.message.text
+            ));
         }
         Ok(out)
     }
@@ -321,12 +365,29 @@ mod tests {
     #[test]
     fn tools_register_and_instructions_teach_pull() {
         let k = Kore::new();
-        let names: Vec<String> =
-            k.tool_router.list_all().into_iter().map(|t| t.name.to_string()).collect();
-        for expect in ["kore_send", "kore_list", "kore_history", "kore_status", "kore_check", "kore_wait"] {
-            assert!(names.contains(&expect.to_string()), "missing tool {expect}: {names:?}");
+        let names: Vec<String> = k
+            .tool_router
+            .list_all()
+            .into_iter()
+            .map(|t| t.name.to_string())
+            .collect();
+        for expect in [
+            "kore_send",
+            "kore_list",
+            "kore_history",
+            "kore_status",
+            "kore_check",
+            "kore_wait",
+        ] {
+            assert!(
+                names.contains(&expect.to_string()),
+                "missing tool {expect}: {names:?}"
+            );
         }
         let ins = ServerHandler::get_info(&k).instructions.unwrap_or_default();
-        assert!(ins.contains("kore_wait") && ins.contains("PULL"), "instructions must teach pull-receive");
+        assert!(
+            ins.contains("kore_wait") && ins.contains("PULL"),
+            "instructions must teach pull-receive"
+        );
     }
 }

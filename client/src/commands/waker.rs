@@ -68,11 +68,20 @@ impl Poke {
                     && ok(Command::new("tmux").args(["send-keys", "-t", pane, "Enter"]))
             }
             Self::Wezterm(id) => ok(Command::new("wezterm").args([
-                "cli", "send-text", "--pane-id", id, "--no-paste", &format!("{NUDGE}\r"),
+                "cli",
+                "send-text",
+                "--pane-id",
+                id,
+                "--no-paste",
+                &format!("{NUDGE}\r"),
             ])),
             // Needs allow_remote_control in kitty.conf (same as --terminal split).
             Self::Kitty(id) => ok(Command::new("kitty").args([
-                "@", "send-text", "--match", &format!("id:{id}"), &format!("{NUDGE}\r"),
+                "@",
+                "send-text",
+                "--match",
+                &format!("id:{id}"),
+                &format!("{NUDGE}\r"),
             ])),
         }
     }
@@ -89,7 +98,9 @@ fn cmdline_contains(pid: u32, needle: &str) -> bool {
 /// Server truth for "does this agent still have something unread". 0 on any
 /// error — a broken check must never cause a poke.
 async fn unread_count() -> i64 {
-    let Ok(token) = config::load_token() else { return 0 };
+    let Ok(token) = config::load_token() else {
+        return 0;
+    };
     let Ok(resp) = config::http_client()
         .get(format!("{}/v1/messages/unread", config::server_url()))
         .bearer_auth(token)
@@ -197,9 +208,15 @@ mod tests {
     #[test]
     fn cmdline_guard_matches_own_process() {
         let me = std::process::id();
-        assert!(cmdline_contains(me, "kore"), "test binary path contains 'kore'");
+        assert!(
+            cmdline_contains(me, "kore"),
+            "test binary path contains 'kore'"
+        );
         assert!(!cmdline_contains(me, "definitely-not-in-any-cmdline"));
-        assert!(!cmdline_contains(u32::MAX - 1, "anything"), "dead pid never matches");
+        assert!(
+            !cmdline_contains(u32::MAX - 1, "anything"),
+            "dead pid never matches"
+        );
     }
 
     /// Backend priority: tmux > wezterm > kitty; none of the env vars → None

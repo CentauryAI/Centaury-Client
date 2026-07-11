@@ -95,7 +95,11 @@ fn inject_workspace_trust(tool: &str, tool_args: &mut Vec<String>) {
         "gemini" if !tool_args.iter().any(|a| a == "--skip-trust") => {
             tool_args.push("--skip-trust".to_string());
         }
-        "codex" if !tool_args.windows(2).any(|w| w[0] == "-c" && w[1].contains("trust_level")) => {
+        "codex"
+            if !tool_args
+                .windows(2)
+                .any(|w| w[0] == "-c" && w[1].contains("trust_level")) =>
+        {
             let dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let canonical = std::fs::canonicalize(&dir).unwrap_or(dir);
             tool_args.push("-c".to_string());
@@ -125,10 +129,15 @@ fn inject_workspace_trust(tool: &str, tool_args: &mut Vec<String>) {
 fn seed_claude_trust() -> anyhow::Result<()> {
     let state_path = match std::env::var("CLAUDE_CONFIG_DIR") {
         Ok(dir) => std::path::PathBuf::from(dir).join(".claude.json"),
-        Err(_) => dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home dir"))?.join(".claude.json"),
+        Err(_) => dirs::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("no home dir"))?
+            .join(".claude.json"),
     };
     let dir = std::env::current_dir()?;
-    let cwd = std::fs::canonicalize(&dir).unwrap_or(dir).to_string_lossy().into_owned();
+    let cwd = std::fs::canonicalize(&dir)
+        .unwrap_or(dir)
+        .to_string_lossy()
+        .into_owned();
 
     let mut root: serde_json::Value = match std::fs::read_to_string(&state_path) {
         Ok(s) => serde_json::from_str(&s).unwrap_or_else(|_| serde_json::json!({})),
@@ -144,11 +153,16 @@ fn seed_claude_trust() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("claude 'projects' is not an object"))?
         .entry(cwd)
         .or_insert_with(|| serde_json::json!({}));
-    let obj = entry.as_object_mut().ok_or_else(|| anyhow::anyhow!("claude project entry is not an object"))?;
+    let obj = entry
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("claude project entry is not an object"))?;
     if obj.get("hasTrustDialogAccepted").and_then(|v| v.as_bool()) == Some(true) {
         return Ok(()); // already trusted — never rewrite the file for nothing
     }
-    obj.insert("hasTrustDialogAccepted".into(), serde_json::Value::Bool(true));
+    obj.insert(
+        "hasTrustDialogAccepted".into(),
+        serde_json::Value::Bool(true),
+    );
     std::fs::write(&state_path, serde_json::to_string(&root)?)?;
     Ok(())
 }
@@ -162,7 +176,13 @@ fn cursor_trust_slug(path: &std::path::Path) -> String {
         .filter(|p| !p.is_empty())
         .map(|p| {
             p.chars()
-                .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' })
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                        c
+                    } else {
+                        '-'
+                    }
+                })
                 .collect::<String>()
         })
         .collect::<Vec<_>>()
@@ -201,7 +221,10 @@ fn seed_cursor_trust_marker() -> anyhow::Result<()> {
 /// new session id; use `kore-client resume` for them.
 pub async fn run_fork(mut args: LaunchArgs) -> anyhow::Result<()> {
     if args.tool != "claude" {
-        anyhow::bail!("fork supports claude only ({} can't fork sessions — use `kore-client resume`)", args.tool);
+        anyhow::bail!(
+            "fork supports claude only ({} can't fork sessions — use `kore-client resume`)",
+            args.tool
+        );
     }
     let mut tool_args = vec!["--continue".to_string(), "--fork-session".to_string()];
     tool_args.extend(std::mem::take(&mut args.tool_args));
@@ -215,7 +238,9 @@ pub async fn run_fork(mut args: LaunchArgs) -> anyhow::Result<()> {
 pub async fn run(mut args: LaunchArgs) -> anyhow::Result<()> {
     let wait = args.wait;
     if wait.is_some() && !args.headless && args.terminal.is_none() {
-        anyhow::bail!("--wait needs --terminal or --headless (an interactive launch blocks here anyway)");
+        anyhow::bail!(
+            "--wait needs --terminal or --headless (an interactive launch blocks here anyway)"
+        );
     }
     if args.tag.is_none() {
         args.tag = std::env::var("KORE_TAG").ok().filter(|t| !t.is_empty());
@@ -247,7 +272,10 @@ pub async fn run(mut args: LaunchArgs) -> anyhow::Result<()> {
         args.name = Some(names[0].clone());
     }
     revive(&names, &args).await;
-    let project = args.project.clone().or_else(|| std::env::var("KORE_PROJECT").ok());
+    let project = args
+        .project
+        .clone()
+        .or_else(|| std::env::var("KORE_PROJECT").ok());
     // Fail fast on a bad/nonexistent --role/--skill before we spawn anything.
     validate_role_skills(&args, project.as_deref()).await?;
     if wait.is_some() {
@@ -305,7 +333,9 @@ async fn validate_role_skills(args: &LaunchArgs, project: Option<&str>) -> anyho
                  kore-client role create {title:?} --content \"...\""
             ),
             Ok(_) => {}
-            Err(e) => eprintln!("[kore] couldn't verify role '{title}' ({e}) — launching anyway; the hook self-assigns"),
+            Err(e) => eprintln!(
+                "[kore] couldn't verify role '{title}' ({e}) — launching anyway; the hook self-assigns"
+            ),
         }
     }
     if !skill_names.is_empty() {
@@ -317,8 +347,11 @@ async fn validate_role_skills(args: &LaunchArgs, project: Option<&str>) -> anyho
             Ok(skills) => {
                 let have: std::collections::HashSet<&str> =
                     skills.iter().map(|s| s.name.as_str()).collect();
-                let missing: Vec<&str> =
-                    skill_names.iter().map(String::as_str).filter(|n| !have.contains(n)).collect();
+                let missing: Vec<&str> = skill_names
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|n| !have.contains(n))
+                    .collect();
                 if !missing.is_empty() {
                     anyhow::bail!(
                         "skill(s) not found in project '{project}': {} — create with \
@@ -327,7 +360,9 @@ async fn validate_role_skills(args: &LaunchArgs, project: Option<&str>) -> anyho
                     );
                 }
             }
-            Err(e) => eprintln!("[kore] couldn't verify skills ({e}) — launching anyway; the hook self-assigns"),
+            Err(e) => eprintln!(
+                "[kore] couldn't verify skills ({e}) — launching anyway; the hook self-assigns"
+            ),
         }
     }
     Ok(())
@@ -360,8 +395,15 @@ fn resolve_names(args: &LaunchArgs) -> Vec<String> {
 /// the moment the server accepts the register call, so it doubles as the
 /// registration receipt without a roster API call (which couldn't see across
 /// sealed project bubbles anyway).
-async fn wait_for_registration(names: &[String], project: Option<&str>, secs: u64) -> anyhow::Result<()> {
-    println!("waiting up to {secs}s for {} agent(s) to register...", names.len());
+async fn wait_for_registration(
+    names: &[String],
+    project: Option<&str>,
+    secs: u64,
+) -> anyhow::Result<()> {
+    println!(
+        "waiting up to {secs}s for {} agent(s) to register...",
+        names.len()
+    );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(secs);
     loop {
         let missing = missing_names(names, project);
@@ -393,12 +435,16 @@ fn missing_names(names: &[String], project: Option<&str>) -> Vec<String> {
 /// works — the agent self-registers via its SessionStart hook.
 async fn preregister(names: &[String], project: Option<&str>, args: &LaunchArgs) {
     let Ok(token) = crate::config::load_token() else {
-        eprintln!("[kore] no identity here — agent will self-register via hooks (needs KORE_REG_SECRET)");
+        eprintln!(
+            "[kore] no identity here — agent will self-register via hooks (needs KORE_REG_SECRET)"
+        );
         return;
     };
     let client = crate::config::http_client();
     let url = format!("{}/v1/instances/agents", crate::config::server_url());
-    let directory = std::env::current_dir().ok().map(|d| d.display().to_string());
+    let directory = std::env::current_dir()
+        .ok()
+        .map(|d| d.display().to_string());
     for name in names {
         let resp = client
             .post(&url)
@@ -427,7 +473,9 @@ async fn preregister(names: &[String], project: Option<&str>, args: &LaunchArgs)
             Ok(r) => {
                 let status = r.status();
                 let text = r.text().await.unwrap_or_default();
-                eprintln!("[kore] pre-register '{name}' failed ({status}): {text} — hooks will retry");
+                eprintln!(
+                    "[kore] pre-register '{name}' failed ({status}): {text} — hooks will retry"
+                );
             }
             Err(e) => eprintln!("[kore] pre-register '{name}' failed: {e} — hooks will retry"),
         }
@@ -438,7 +486,9 @@ async fn preregister(names: &[String], project: Option<&str>, args: &LaunchArgs)
 /// register. Errors ignored: no tombstone / old server / offline server all
 /// mean the register attempt decides, exactly as before G1.
 async fn revive(names: &[String], args: &LaunchArgs) {
-    let Ok(reg_secret) = crate::config::reg_secret() else { return };
+    let Ok(reg_secret) = crate::config::reg_secret() else {
+        return;
+    };
     let client = crate::config::http_client();
     let url = format!("{}/v1/instances/revive", crate::config::server_url());
     for name in names {
@@ -448,7 +498,10 @@ async fn revive(names: &[String], args: &LaunchArgs) {
                 name: name.clone(),
                 reg_secret: reg_secret.clone(),
                 org: std::env::var("KORE_ORG").ok(),
-                project: args.project.clone().or_else(|| std::env::var("KORE_PROJECT").ok()),
+                project: args
+                    .project
+                    .clone()
+                    .or_else(|| std::env::var("KORE_PROJECT").ok()),
             })
             .send()
             .await;
@@ -467,7 +520,12 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
     // tools inject cooperatively inside a live process — their print modes
     // (`opencode run`, `omp -p`) exit at turn end regardless (live-verified
     // opencode 1.17.15 + omp 16.3.8, 2026-07-07); cline has no async inject.
-    if args.stay && matches!(args.tool.as_str(), "opencode" | "kilo" | "pi" | "omp" | "cline") {
+    if args.stay
+        && matches!(
+            args.tool.as_str(),
+            "opencode" | "kilo" | "pi" | "omp" | "cline"
+        )
+    {
         anyhow::bail!(
             "--stay doesn't work for {}: its print mode exits when the turn ends. Launch it interactive (--terminal) instead.",
             args.tool
@@ -485,7 +543,10 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
     // entry into the blocking stop-wait loop (Stop / AfterAgent).
     if args.headless
         && matches!(args.tool.as_str(), "claude" | "gemini")
-        && !args.tool_args.iter().any(|a| a == "-p" || a == "--print" || a == "--prompt")
+        && !args
+            .tool_args
+            .iter()
+            .any(|a| a == "-p" || a == "--print" || a == "--prompt")
     {
         if args.stay {
             // Persistent agent (DU-C1): seed the first turn like interactive does.
@@ -531,7 +592,10 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
     // Always name the agent: KORE_NAME routes its token to a per-agent file
     // ($KORE_DIR/[project/]agents/<name>.token), so it can never pick up the
     // human's token and speak as them.
-    let name = args.name.clone().unwrap_or_else(crate::config::derived_name);
+    let name = args
+        .name
+        .clone()
+        .unwrap_or_else(crate::config::derived_name);
 
     if args.headless {
         return spawn_headless(&name, &args);
@@ -543,7 +607,10 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
     set_kore_env(&mut cmd, &name, &args);
 
     let mut child = cmd.spawn().map_err(|e| {
-        anyhow::anyhow!("cannot launch '{}': {e} (is it installed and on PATH?)", args.tool)
+        anyhow::anyhow!(
+            "cannot launch '{}': {e} (is it installed and on PATH?)",
+            args.tool
+        )
     })?;
     // Terminal-window launches funnel through this path too (the re-exec'd
     // inner `kore-client launch` wraps the tool), so the recorded pid is
@@ -556,7 +623,10 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
 }
 
 fn pid_path(name: &str, args: &LaunchArgs) -> std::path::PathBuf {
-    let project = args.project.clone().or_else(|| std::env::var("KORE_PROJECT").ok());
+    let project = args
+        .project
+        .clone()
+        .or_else(|| std::env::var("KORE_PROJECT").ok());
     crate::config::agent_pid_path(name, project.as_deref())
 }
 
@@ -576,7 +646,9 @@ fn write_pid(name: &str, args: &LaunchArgs, pid: u32) {
 /// dies or no poke backend exists (bare terminal); stderr goes to the log so
 /// "nothing to poke" is findable.
 fn spawn_waker(name: &str, tool_pid: u32, args: &LaunchArgs) {
-    let Ok(exe) = std::env::current_exe() else { return };
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
     let mut cmd = Command::new(exe);
     cmd.args(["waker", name, &tool_pid.to_string(), &args.tool]);
     set_kore_env(&mut cmd, name, args);
@@ -619,12 +691,18 @@ pub fn kill_local(name: &str) -> Option<u32> {
 /// dies.
 fn kill_waker(name: &str, project: Option<&str>) {
     let path = crate::config::agent_waker_pid_path(name, project);
-    let Ok(content) = std::fs::read_to_string(&path) else { return };
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
+    };
     let _ = std::fs::remove_file(&path);
-    let Ok(pid) = content.trim().parse::<u32>() else { return };
+    let Ok(pid) = content.trim().parse::<u32>() else {
+        return;
+    };
     let cmdline = std::fs::read_to_string(format!("/proc/{pid}/cmdline")).unwrap_or_default();
     if cmdline.replace('\0', " ").contains("waker") {
-        let _ = std::process::Command::new("kill").arg(pid.to_string()).status();
+        let _ = std::process::Command::new("kill")
+            .arg(pid.to_string())
+            .status();
     }
 }
 
@@ -671,7 +749,8 @@ fn run_batch(args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
     if !args.headless && args.terminal.is_none() {
         anyhow::bail!(
             "--count {} needs --terminal or --headless ({} interactive agents can't share this terminal)",
-            args.count, args.count
+            args.count,
+            args.count
         );
     }
     for name in names {
@@ -717,10 +796,17 @@ fn spawn_headless(name: &str, args: &LaunchArgs) -> anyhow::Result<()> {
         .stdout(log.try_clone()?)
         .stderr(log);
     let child = cmd.spawn().map_err(|e| {
-        anyhow::anyhow!("cannot launch '{}': {e} (is it installed and on PATH?)", args.tool)
+        anyhow::anyhow!(
+            "cannot launch '{}': {e} (is it installed and on PATH?)",
+            args.tool
+        )
     })?;
     write_pid(name, args, child.id());
-    println!("started '{name}' (headless, pid {}) — log: {}", child.id(), log_path.display());
+    println!(
+        "started '{name}' (headless, pid {}) — log: {}",
+        child.id(),
+        log_path.display()
+    );
     Ok(())
 }
 
@@ -732,9 +818,16 @@ fn spawn_headless(name: &str, args: &LaunchArgs) -> anyhow::Result<()> {
 // bundles return when someone asks (plan B1).
 
 fn spawn_in_terminal(term: &str, args: &LaunchArgs) -> anyhow::Result<()> {
-    let term = if term == "auto" { detect_terminal()? } else { term.to_string() };
+    let term = if term == "auto" {
+        detect_terminal()?
+    } else {
+        term.to_string()
+    };
     // Resolve the name here so the printed name matches the inner launch.
-    let name = args.name.clone().unwrap_or_else(crate::config::derived_name);
+    let name = args
+        .name
+        .clone()
+        .unwrap_or_else(crate::config::derived_name);
     let title = format!("{} — {name}", args.tool);
     let argv = if term == "split" {
         split_argv(inner_launch_argv(&name, args), &title)?
@@ -747,25 +840,43 @@ fn spawn_in_terminal(term: &str, args: &LaunchArgs) -> anyhow::Result<()> {
     if term == "split" {
         // Pane-creating commands return as soon as the pane exists — wait, so
         // "can't split" (e.g. kitty without allow_remote_control) errors here.
-        let out = cmd.output()
-            .map_err(|e| anyhow::anyhow!("cannot spawn '{}': {e} (is it installed and on PATH?)", argv[0]))?;
+        let out = cmd.output().map_err(|e| {
+            anyhow::anyhow!(
+                "cannot spawn '{}': {e} (is it installed and on PATH?)",
+                argv[0]
+            )
+        })?;
         if !out.status.success() {
-            anyhow::bail!("split failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+            anyhow::bail!(
+                "split failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            );
         }
         println!("launching {} as agent '{name}' in a split pane", args.tool);
         return Ok(());
     }
     // ponytail: spawn-and-detach — GUI terminals block until their window
     // closes, so we never wait; a missing binary still errors right here.
-    cmd.spawn()
-        .map_err(|e| anyhow::anyhow!("cannot spawn '{}': {e} (is it installed and on PATH?)", argv[0]))?;
-    println!("launching {} as agent '{name}' in a new {term} window", args.tool);
+    cmd.spawn().map_err(|e| {
+        anyhow::anyhow!(
+            "cannot spawn '{}': {e} (is it installed and on PATH?)",
+            argv[0]
+        )
+    })?;
+    println!(
+        "launching {} as agent '{name}' in a new {term} window",
+        args.tool
+    );
     Ok(())
 }
 
 /// Env → preferred terminal we are inside of; else first supported one on PATH.
 fn detect_terminal() -> anyhow::Result<String> {
-    for (var, term) in [("KITTY_WINDOW_ID", "kitty"), ("WEZTERM_PANE", "wezterm"), ("TMUX", "tmux")] {
+    for (var, term) in [
+        ("KITTY_WINDOW_ID", "kitty"),
+        ("WEZTERM_PANE", "wezterm"),
+        ("TMUX", "tmux"),
+    ] {
         if std::env::var(var).is_ok_and(|v| !v.is_empty()) {
             return Ok(term.to_string());
         }
@@ -775,7 +886,9 @@ fn detect_terminal() -> anyhow::Result<String> {
             return Ok(term.to_string());
         }
     }
-    anyhow::bail!("no supported terminal detected (kitty|wezterm|tmux|foot) — pass --terminal <name>")
+    anyhow::bail!(
+        "no supported terminal detected (kitty|wezterm|tmux|foot) — pass --terminal <name>"
+    )
 }
 
 fn on_path(bin: &str) -> bool {
@@ -789,10 +902,20 @@ fn inner_launch_argv(name: &str, args: &LaunchArgs) -> Vec<String> {
     let exe = std::env::current_exe()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| "kore-client".to_string());
-    let mut v = vec![exe, "launch".into(), "--name".into(), name.into(), "--tool".into(), args.tool.clone()];
-    for (flag, val) in
-        [("--project", &args.project), ("--owner", &args.owner), ("--tag", &args.tag), ("--role", &args.role)]
-    {
+    let mut v = vec![
+        exe,
+        "launch".into(),
+        "--name".into(),
+        name.into(),
+        "--tool".into(),
+        args.tool.clone(),
+    ];
+    for (flag, val) in [
+        ("--project", &args.project),
+        ("--owner", &args.owner),
+        ("--tag", &args.tag),
+        ("--role", &args.role),
+    ] {
         if let Some(val) = val {
             v.extend([flag.to_string(), val.clone()]);
         }
@@ -821,14 +944,25 @@ fn terminal_argv(term: &str, inner: Vec<String>, title: &str) -> anyhow::Result<
         "foot" => vec!["foot".into(), "-T".into(), title.into()],
         "wezterm" => vec!["wezterm".into(), "start".into(), "--".into()],
         "tmux" => {
-            let mut v = vec!["tmux".into(), "new-window".into(), "-n".into(), title.into()];
+            let mut v = vec![
+                "tmux".into(),
+                "new-window".into(),
+                "-n".into(),
+                title.into(),
+            ];
             if let Ok(cwd) = std::env::current_dir() {
                 v.extend(["-c".into(), cwd.display().to_string()]);
             }
             for (k, val) in std::env::vars().filter(|(k, _)| k.starts_with("KORE_")) {
                 v.extend(["-e".into(), format!("{k}={val}")]);
             }
-            v.push(inner.iter().map(|s| shell_quote(s)).collect::<Vec<_>>().join(" "));
+            v.push(
+                inner
+                    .iter()
+                    .map(|s| shell_quote(s))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
             return Ok(v);
         }
         other => anyhow::bail!("unsupported terminal '{other}' (kitty|wezterm|tmux|foot)"),
@@ -850,7 +984,13 @@ fn split_argv(inner: Vec<String>, title: &str) -> anyhow::Result<Vec<String>> {
         for (k, val) in kore_env() {
             v.extend(["-e".into(), format!("{k}={val}")]);
         }
-        v.push(inner.iter().map(|s| shell_quote(s)).collect::<Vec<_>>().join(" "));
+        v.push(
+            inner
+                .iter()
+                .map(|s| shell_quote(s))
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
         return Ok(v);
     }
     if std::env::var("WEZTERM_PANE").is_ok_and(|v| !v.is_empty()) {
@@ -867,9 +1007,13 @@ fn split_argv(inner: Vec<String>, title: &str) -> anyhow::Result<Vec<String>> {
     if std::env::var("KITTY_WINDOW_ID").is_ok_and(|v| !v.is_empty()) {
         // Needs allow_remote_control in kitty.conf; kitty errors loudly if not.
         let mut v = vec![
-            "kitty".into(), "@".into(), "launch".into(),
-            "--location=vsplit".into(), "--cwd=current".into(),
-            "--title".into(), title.into(),
+            "kitty".into(),
+            "@".into(),
+            "launch".into(),
+            "--location=vsplit".into(),
+            "--cwd=current".into(),
+            "--title".into(),
+            title.into(),
         ];
         for (k, val) in kore_env() {
             v.extend(["--env".into(), format!("{k}={val}")]);
@@ -885,7 +1029,10 @@ fn split_argv(inner: Vec<String>, title: &str) -> anyhow::Result<Vec<String>> {
 
 /// Minimal POSIX single-quote escaping for the tmux shell-command string.
 fn shell_quote(s: &str) -> String {
-    if !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./@=:".contains(c)) {
+    if !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-_./@=:".contains(c))
+    {
         s.to_string()
     } else {
         format!("'{}'", s.replace('\'', r"'\''"))
@@ -898,7 +1045,12 @@ mod tests {
 
     #[test]
     fn terminal_argv_wraps_inner_command() {
-        let inner = vec!["kore-client".to_string(), "launch".into(), "--name".into(), "luna".into()];
+        let inner = vec![
+            "kore-client".to_string(),
+            "launch".into(),
+            "--name".into(),
+            "luna".into(),
+        ];
         let title = "claude — luna";
 
         // argv-passing terminals: title flag, then inner command verbatim
@@ -1039,13 +1191,17 @@ mod tests {
             std::env::remove_var("KORE_PROJECT");
         }
 
-        let mut child = std::process::Command::new("sleep").arg("30").spawn().unwrap();
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
         let pid = child.id();
         // spawn() returns pre-exec: /proc/<pid>/cmdline still shows the fork
         // copy for a moment. Wait until the child actually IS `sleep`, or the
         // pid-reuse guard in kill_local correctly (but flakily) refuses.
         for _ in 0..100 {
-            let cmdline = std::fs::read_to_string(format!("/proc/{pid}/cmdline")).unwrap_or_default();
+            let cmdline =
+                std::fs::read_to_string(format!("/proc/{pid}/cmdline")).unwrap_or_default();
             if cmdline.contains("sleep") {
                 break;
             }
@@ -1060,7 +1216,10 @@ mod tests {
         // SIGTERM delivered: wait() returns a signal-killed status, and it
         // returns now instead of after the full 30s sleep.
         let status = child.wait().unwrap();
-        assert!(!status.success(), "process must die from SIGTERM, not exit 0");
+        assert!(
+            !status.success(),
+            "process must die from SIGTERM, not exit 0"
+        );
 
         // Stale pid (tool no longer matches) → no signal, file still consumed.
         std::fs::write(&path, "99999999 sleep").unwrap();

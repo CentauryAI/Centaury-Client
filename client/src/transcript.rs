@@ -68,12 +68,17 @@ fn files_newest_first(roots: impl IntoIterator<Item = PathBuf>, exts: &[&str]) -
     let mut files: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
     let mut stack: Vec<PathBuf> = roots.into_iter().collect();
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
-            } else if path.extension().and_then(|e| e.to_str()).is_some_and(|e| exts.contains(&e))
+            } else if path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| exts.contains(&e))
                 && let Ok(mtime) = entry.metadata().and_then(|m| m.modified())
             {
                 files.push((mtime, path));
@@ -90,7 +95,10 @@ fn files_newest_first(roots: impl IntoIterator<Item = PathBuf>, exts: &[&str]) -
 /// default `~/.claude` — a machine can have both in use (e.g. subscription
 /// vs default installs), and the agent may have run under either.
 fn claude_dirs() -> Vec<PathBuf> {
-    let mut dirs_: Vec<PathBuf> = std::env::var("CLAUDE_CONFIG_DIR").map(PathBuf::from).into_iter().collect();
+    let mut dirs_: Vec<PathBuf> = std::env::var("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .into_iter()
+        .collect();
     let default = dirs::home_dir().unwrap_or_default().join(".claude");
     if !dirs_.contains(&default) {
         dirs_.push(default);
@@ -136,7 +144,9 @@ fn find_claude_session(name: &str, dir: &str) -> Option<(String, PathBuf)> {
 /// marker text (an agent reading kore's own source, say); a conversation
 /// cannot fabricate a top-level hook attachment entry.
 fn has_session_start_marker(path: &Path, marker: &str) -> bool {
-    let Some(lines) = lines_of(path) else { return false };
+    let Some(lines) = lines_of(path) else {
+        return false;
+    };
     // The injection sits near the top of the file, so this exits early.
     lines.into_iter().any(|line| {
         // cheap pre-filter before JSON parse
@@ -157,7 +167,9 @@ pub fn parse_claude(path: &Path) -> anyhow::Result<Vec<Exchange>> {
     let content = std::fs::read_to_string(path)?;
     let mut out = Vec::new();
     for line in content.lines() {
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         if ["isMeta", "isSidechain", "isCompactSummary"]
             .iter()
             .any(|f| v.get(f).and_then(|b| b.as_bool()).unwrap_or(false))
@@ -173,7 +185,11 @@ pub fn parse_claude(path: &Path) -> anyhow::Result<Vec<Exchange>> {
             continue;
         }
         out.push(Exchange {
-            ts: v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+            ts: v
+                .get("timestamp")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string(),
             role: role.to_string(),
             text,
         });
@@ -215,20 +231,30 @@ fn gemini_tmp_root() -> PathBuf {
 /// fires and newest-marked wins).
 fn find_gemini_session(name: &str, dir: &str) -> Option<(String, PathBuf)> {
     let marker = session_marker(name);
-    let candidates: Vec<(String, PathBuf)> = files_newest_first([gemini_tmp_root()], &["json", "jsonl"])
-        .into_iter()
-        .filter(|p| {
-            p.parent().is_some_and(|d| d.file_name().is_some_and(|n| n == "chats"))
-                && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("session-"))
-        })
-        .filter_map(|p| {
-            let id = gemini_marked_session_id(&p, &marker)?;
-            Some((id, p))
-        })
-        .collect();
+    let candidates: Vec<(String, PathBuf)> =
+        files_newest_first([gemini_tmp_root()], &["json", "jsonl"])
+            .into_iter()
+            .filter(|p| {
+                p.parent()
+                    .is_some_and(|d| d.file_name().is_some_and(|n| n == "chats"))
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("session-"))
+            })
+            .filter_map(|p| {
+                let id = gemini_marked_session_id(&p, &marker)?;
+                Some((id, p))
+            })
+            .collect();
 
     let base = Path::new(dir).file_name()?.to_str()?.to_lowercase();
-    let project_of = |p: &Path| p.ancestors().nth(2)?.file_name()?.to_str().map(str::to_lowercase);
+    let project_of = |p: &Path| {
+        p.ancestors()
+            .nth(2)?
+            .file_name()?
+            .to_str()
+            .map(str::to_lowercase)
+    };
     candidates
         .iter()
         .find(|(_, p)| project_of(p) == Some(base.clone()))
@@ -251,7 +277,8 @@ fn gemini_marked_session_id(path: &Path, marker: &str) -> Option<String> {
         .any(|line| {
             line.contains(marker)
                 && serde_json::from_str::<Value>(&line).is_ok_and(|v| {
-                    v["type"] == "user" && gemini_text(v.get("content").unwrap_or(&Value::Null)).contains(marker)
+                    v["type"] == "user"
+                        && gemini_text(v.get("content").unwrap_or(&Value::Null)).contains(marker)
                 })
         })
         .then_some(id)
@@ -281,7 +308,10 @@ pub fn parse_gemini(path: &Path) -> anyhow::Result<Vec<Exchange>> {
         Ok(doc) if doc.get("messages").is_some() => {
             doc["messages"].as_array().cloned().unwrap_or_default()
         }
-        _ => content.lines().filter_map(|l| serde_json::from_str(l).ok()).collect(),
+        _ => content
+            .lines()
+            .filter_map(|l| serde_json::from_str(l).ok())
+            .collect(),
     };
     let mut out = Vec::new();
     for v in entries {
@@ -295,7 +325,11 @@ pub fn parse_gemini(path: &Path) -> anyhow::Result<Vec<Exchange>> {
             continue;
         }
         out.push(Exchange {
-            ts: v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+            ts: v
+                .get("timestamp")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string(),
             role: role.to_string(),
             text,
         });
@@ -320,7 +354,9 @@ fn codex_sessions_root() -> PathBuf {
 fn find_codex_session(name: &str, dir: &str) -> Option<(String, PathBuf)> {
     let marker = session_marker(name);
     for path in files_newest_first([codex_sessions_root()], &["jsonl"]) {
-        let Some(mut lines) = lines_of(&path) else { continue };
+        let Some(mut lines) = lines_of(&path) else {
+            continue;
+        };
         // session_meta is line 1 in practice; scan a few in case of prefixes.
         // A cwd mismatch drops the file after these few lines — the bulk of
         // foreign rollouts is never read.
@@ -351,7 +387,9 @@ pub fn parse_codex(path: &Path) -> anyhow::Result<Vec<Exchange>> {
     let content = std::fs::read_to_string(path)?;
     let mut out: Vec<Exchange> = Vec::new();
     for line in content.lines() {
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         let payload = v.get("payload").unwrap_or(&v);
         let (role, text) = match payload.get("type").and_then(|t| t.as_str()) {
             Some("message") => {
@@ -375,11 +413,18 @@ pub fn parse_codex(path: &Path) -> anyhow::Result<Vec<Exchange>> {
         {
             continue;
         }
-        if out.last().is_some_and(|e| e.role == role && e.text.trim() == trimmed) {
+        if out
+            .last()
+            .is_some_and(|e| e.role == role && e.text.trim() == trimmed)
+        {
             continue; // response_item/event_msg double-logging of one turn
         }
         out.push(Exchange {
-            ts: v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+            ts: v
+                .get("timestamp")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string(),
             role: role.to_string(),
             text,
         });
@@ -420,7 +465,11 @@ fn omp_sessions_root() -> PathBuf {
             return PathBuf::from(d).join("sessions");
         }
     }
-    dirs::home_dir().unwrap_or_default().join(".omp").join("agent").join("sessions")
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".omp")
+        .join("agent")
+        .join("sessions")
 }
 
 /// Marker gate: the kore extension's hidden bootstrap is recorded as a
@@ -430,7 +479,9 @@ fn omp_sessions_root() -> PathBuf {
 fn find_omp_session(name: &str, dir: &str) -> Option<(String, PathBuf)> {
     let marker = session_marker(name);
     for path in files_newest_first([omp_sessions_root()], &["jsonl"]) {
-        let Some(mut lines) = lines_of(&path) else { continue };
+        let Some(mut lines) = lines_of(&path) else {
+            continue;
+        };
         // The session header sits in the first lines (after a `title` entry).
         let Some(header) = lines.by_ref().take(5).find_map(|l| {
             let v: Value = serde_json::from_str(&l).ok()?;
@@ -463,7 +514,9 @@ pub fn parse_omp(path: &Path) -> anyhow::Result<Vec<Exchange>> {
     let content = std::fs::read_to_string(path)?;
     let mut out: Vec<Exchange> = Vec::new();
     for line in content.lines() {
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         if v["type"] != "message" {
             continue;
         }
@@ -486,7 +539,11 @@ pub fn parse_omp(path: &Path) -> anyhow::Result<Vec<Exchange>> {
             continue;
         }
         out.push(Exchange {
-            ts: v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+            ts: v
+                .get("timestamp")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string(),
             role: role.to_string(),
             text,
         });
@@ -507,7 +564,8 @@ mod tests {
 
     #[test]
     fn finds_and_parses_marked_session() {
-        let base = std::env::temp_dir().join(format!("kore-transcript-test-{}", std::process::id()));
+        let base =
+            std::env::temp_dir().join(format!("kore-transcript-test-{}", std::process::id()));
         let proj = base.join("projects/-tmp-work");
         std::fs::create_dir_all(&proj).unwrap();
         let session = "0b7a3c1e-1111-2222-3333-444455556666";
@@ -536,12 +594,25 @@ mod tests {
         let (id, path) = find_session("claude", "luna", "/tmp/work").expect("session found");
         assert_eq!(id, session);
         assert_eq!(cwd_of(&path).as_deref(), Some("/tmp/work"));
-        assert!(find_session("claude", "nova", "/tmp/work").is_none(), "marker is per-agent");
-        assert!(find_session("claude", "luna", "/elsewhere").is_none(), "cwd must match");
+        assert!(
+            find_session("claude", "nova", "/tmp/work").is_none(),
+            "marker is per-agent"
+        );
+        assert!(
+            find_session("claude", "luna", "/elsewhere").is_none(),
+            "cwd must match"
+        );
 
         let ex = parse("claude", &path).unwrap();
-        assert_eq!(ex.len(), 3, "hello / done / discussion — attachment + isMeta lines skipped");
-        assert_eq!((ex[1].role.as_str(), ex[1].text.as_str()), ("assistant", "done"));
+        assert_eq!(
+            ex.len(),
+            3,
+            "hello / done / discussion — attachment + isMeta lines skipped"
+        );
+        assert_eq!(
+            (ex[1].role.as_str(), ex[1].text.as_str()),
+            ("assistant", "done")
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -569,23 +640,40 @@ mod tests {
         };
         let sid_mine = "63eab157-0000-0000-0000-000000000001";
         let sid_other = "63eab157-0000-0000-0000-000000000002";
-        std::fs::write(mine.join("session-2026-07-05T10-00-63eab157.jsonl"), file_for(sid_mine, "luna")).unwrap();
+        std::fs::write(
+            mine.join("session-2026-07-05T10-00-63eab157.jsonl"),
+            file_for(sid_mine, "luna"),
+        )
+        .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(20)); // distinct mtimes — "other" must sort newer
-        std::fs::write(other.join("session-2026-07-05T11-00-63eab157.jsonl"), file_for(sid_other, "luna")).unwrap();
+        std::fs::write(
+            other.join("session-2026-07-05T11-00-63eab157.jsonl"),
+            file_for(sid_other, "luna"),
+        )
+        .unwrap();
 
         unsafe { std::env::set_var("GEMINI_CLI_HOME", &base) };
 
         // MyProj basename matches tmp dir "myproj" case-insensitively
         let (id, path) = find_session("gemini", "luna", "/tmp/MyProj").expect("session found");
-        assert_eq!(id, sid_mine, "project-dir match beats newer session elsewhere");
-        assert!(find_session("gemini", "nova", "/tmp/MyProj").is_none(), "marker is per-agent");
+        assert_eq!(
+            id, sid_mine,
+            "project-dir match beats newer session elsewhere"
+        );
+        assert!(
+            find_session("gemini", "nova", "/tmp/MyProj").is_none(),
+            "marker is per-agent"
+        );
         // no dir match → newest marked session wins
         let (id, _) = find_session("gemini", "luna", "/somewhere/else").unwrap();
         assert_eq!(id, sid_other);
 
         let ex = parse("gemini", &path).unwrap();
         assert_eq!(ex.len(), 2, "info/$set/header skipped");
-        assert_eq!((ex[1].role.as_str(), ex[1].text.as_str()), ("assistant", "hi, boss"));
+        assert_eq!(
+            (ex[1].role.as_str(), ex[1].text.as_str()),
+            ("assistant", "hi, boss")
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -613,20 +701,39 @@ mod tests {
             serde_json::json!({"timestamp":"t4","type":"response_item","payload":{
                 "type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>stuff"}]}}),
         );
-        std::fs::write(day.join(format!("rollout-2026-07-05T10-00-00-{sid}.jsonl")), jsonl).unwrap();
+        std::fs::write(
+            day.join(format!("rollout-2026-07-05T10-00-00-{sid}.jsonl")),
+            jsonl,
+        )
+        .unwrap();
 
         unsafe { std::env::set_var("CODEX_HOME", &base) };
 
         let (id, path) = find_session("codex", "luna", "/tmp/work").expect("session found");
-        assert_eq!(id, sid, "resume id comes from session_meta, not the filename");
-        assert!(find_session("codex", "nova", "/tmp/work").is_none(), "marker is per-agent");
-        assert!(find_session("codex", "luna", "/elsewhere").is_none(), "cwd must match");
+        assert_eq!(
+            id, sid,
+            "resume id comes from session_meta, not the filename"
+        );
+        assert!(
+            find_session("codex", "nova", "/tmp/work").is_none(),
+            "marker is per-agent"
+        );
+        assert!(
+            find_session("codex", "luna", "/elsewhere").is_none(),
+            "cwd must match"
+        );
 
         let ex = parse("codex", &path).unwrap();
         // marker turn + "fix the bug" (dupe collapsed) + "fixed"; env blob skipped
         assert_eq!(ex.len(), 3);
-        assert_eq!((ex[1].role.as_str(), ex[1].text.as_str()), ("user", "fix the bug"));
-        assert_eq!((ex[2].role.as_str(), ex[2].text.as_str()), ("assistant", "fixed"));
+        assert_eq!(
+            (ex[1].role.as_str(), ex[1].text.as_str()),
+            ("user", "fix the bug")
+        );
+        assert_eq!(
+            (ex[2].role.as_str(), ex[2].text.as_str()),
+            ("assistant", "fixed")
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -655,20 +762,36 @@ mod tests {
             serde_json::json!({"type":"message","id":"m4","timestamp":"t4",
                 "message":{"role":"user","content":[{"type":"text","text":format!("look: {}", session_marker("nova"))}]}}),
         );
-        std::fs::write(dir.join(format!("2026-07-08T00-00-00-000Z_{sid}.jsonl")), jsonl).unwrap();
+        std::fs::write(
+            dir.join(format!("2026-07-08T00-00-00-000Z_{sid}.jsonl")),
+            jsonl,
+        )
+        .unwrap();
 
         unsafe { std::env::set_var("PI_CODING_AGENT_DIR", &base) };
 
         let (id, path) = find_session("omp", "luna", "/tmp/work").expect("session found");
         assert_eq!(id, sid, "resume id comes from the session header line");
-        assert!(find_session("omp", "nova", "/tmp/work").is_none(), "quoted marker must not count");
-        assert!(find_session("omp", "luna", "/elsewhere").is_none(), "cwd must match");
+        assert!(
+            find_session("omp", "nova", "/tmp/work").is_none(),
+            "quoted marker must not count"
+        );
+        assert!(
+            find_session("omp", "luna", "/elsewhere").is_none(),
+            "cwd must match"
+        );
 
         let ex = parse("omp", &path).unwrap();
         // hello / done (thinking block dropped) / quoted-marker msg; toolResult skipped
         assert_eq!(ex.len(), 3);
-        assert_eq!((ex[0].role.as_str(), ex[0].text.as_str()), ("user", "hello"));
-        assert_eq!((ex[1].role.as_str(), ex[1].text.as_str()), ("assistant", "done"));
+        assert_eq!(
+            (ex[0].role.as_str(), ex[0].text.as_str()),
+            ("user", "hello")
+        );
+        assert_eq!(
+            (ex[1].role.as_str(), ex[1].text.as_str()),
+            ("assistant", "done")
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }

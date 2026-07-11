@@ -44,7 +44,10 @@ fn detect_tools() -> Vec<ToolHit> {
     ];
     TOOLS
         .iter()
-        .map(|(name, bin)| ToolHit { name: name.to_string(), found: on_path(bin) })
+        .map(|(name, bin)| ToolHit {
+            name: name.to_string(),
+            found: on_path(bin),
+        })
         .collect()
 }
 
@@ -82,7 +85,11 @@ fn run_kore(cmd: &mut Command) -> Result<String, String> {
     if out.status.success() {
         Ok(text)
     } else {
-        Err(if text.trim().is_empty() { format!("kore-client failed ({})", out.status) } else { text })
+        Err(if text.trim().is_empty() {
+            format!("kore-client failed ({})", out.status)
+        } else {
+            text
+        })
     }
 }
 
@@ -92,7 +99,12 @@ fn run_kore(cmd: &mut Command) -> Result<String, String> {
 /// dance. No --go needed: the app shell has no KORE_NAME (D10 gates agents,
 /// not humans).
 #[tauri::command]
-fn kill_agent(server: String, token: String, project: String, name: String) -> Result<String, String> {
+fn kill_agent(
+    server: String,
+    token: String,
+    project: String,
+    name: String,
+) -> Result<String, String> {
     write_project_token(&project, &token)?;
     let mut cmd = Command::new(kore_bin());
     cmd.arg("kill")
@@ -155,7 +167,8 @@ fn spawn_launch(opts: LaunchOpts) -> Result<String, String> {
     if let Some(d) = opts.dir.as_deref().filter(|d| !d.is_empty()) {
         cmd.current_dir(d);
     }
-    cmd.env("KORE_SERVER_URL", &opts.server).env("KORE_PROJECT", &opts.project);
+    cmd.env("KORE_SERVER_URL", &opts.server)
+        .env("KORE_PROJECT", &opts.project);
     run_kore(&mut cmd)
 }
 
@@ -172,12 +185,17 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.handle().plugin(tauri_plugin_process::init())?;
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![detect_tools, spawn_launch, kill_agent])
+        .invoke_handler(tauri::generate_handler![
+            detect_tools,
+            spawn_launch,
+            kill_agent
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

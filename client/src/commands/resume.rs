@@ -28,7 +28,10 @@ pub async fn run(args: ResumeArgs) -> anyhow::Result<()> {
         .into_iter()
         .find(|i| i.name == args.name)
         .ok_or_else(|| {
-            anyhow::anyhow!("no instance '{}' in your project (see `kore-client list`)", args.name)
+            anyhow::anyhow!(
+                "no instance '{}' in your project (see `kore-client list`)",
+                args.name
+            )
         })?;
 
     let tool = inst.tool.unwrap_or_else(|| "claude".to_string());
@@ -38,28 +41,37 @@ pub async fn run(args: ResumeArgs) -> anyhow::Result<()> {
     let resume_verb: &[&str] = match tool.as_str() {
         "claude" | "gemini" | "omp" => &["--resume"],
         "codex" => &["resume"],
-        other => anyhow::bail!("resume supports claude, gemini, codex and omp ('{}' runs {other})", args.name),
-    };
-    let dir = inst.directory.ok_or_else(|| {
-        anyhow::anyhow!("server has no directory recorded for '{}'", args.name)
-    })?;
-
-    let (session_id, path) = transcript::find_session(&tool, &args.name, &dir).ok_or_else(|| {
-        anyhow::anyhow!(
-            "no {tool} session for '{}' in {dir} on this machine \
-             (the agent must have run here with hooks at least once)",
+        other => anyhow::bail!(
+            "resume supports claude, gemini, codex and omp ('{}' runs {other})",
             args.name
-        )
-    })?;
+        ),
+    };
+    let dir = inst
+        .directory
+        .ok_or_else(|| anyhow::anyhow!("server has no directory recorded for '{}'", args.name))?;
 
-    if let Some(last) = transcript::parse(&tool, &path).ok().and_then(|v| v.into_iter().last()) {
+    let (session_id, path) =
+        transcript::find_session(&tool, &args.name, &dir).ok_or_else(|| {
+            anyhow::anyhow!(
+                "no {tool} session for '{}' in {dir} on this machine \
+             (the agent must have run here with hooks at least once)",
+                args.name
+            )
+        })?;
+
+    if let Some(last) = transcript::parse(&tool, &path)
+        .ok()
+        .and_then(|v| v.into_iter().last())
+    {
         let snippet: String = last.text.chars().take(80).collect();
-        println!("resuming '{}' — last activity {} [{}] {snippet}", args.name, last.ts, last.role);
+        println!(
+            "resuming '{}' — last activity {} [{}] {snippet}",
+            args.name, last.ts, last.role
+        );
     }
 
     // Every tool keys sessions by cwd: resume must run where the session lived.
-    std::env::set_current_dir(&dir)
-        .map_err(|e| anyhow::anyhow!("cannot enter '{dir}': {e}"))?;
+    std::env::set_current_dir(&dir).map_err(|e| anyhow::anyhow!("cannot enter '{dir}': {e}"))?;
 
     let mut tool_args: Vec<String> = resume_verb.iter().map(|s| s.to_string()).collect();
     tool_args.push(session_id);

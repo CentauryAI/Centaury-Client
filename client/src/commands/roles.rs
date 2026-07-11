@@ -51,7 +51,8 @@ pub enum SkillCmd {
 
 /// Same resolution rule as launch: flag → KORE_PROJECT → "default".
 fn project_or_default(p: Option<String>) -> String {
-    p.or_else(|| std::env::var("KORE_PROJECT").ok()).unwrap_or_else(|| "default".into())
+    p.or_else(|| std::env::var("KORE_PROJECT").ok())
+        .unwrap_or_else(|| "default".into())
 }
 
 async fn post_json<B: serde::Serialize>(path: &str, body: &B) -> anyhow::Result<()> {
@@ -69,9 +70,16 @@ async fn post_json<B: serde::Serialize>(path: &str, body: &B) -> anyhow::Result<
 
 pub async fn role(cmd: RoleCmd) -> anyhow::Result<()> {
     match cmd {
-        RoleCmd::Create { title, content, project } => {
+        RoleCmd::Create {
+            title,
+            content,
+            project,
+        } => {
             let project = project_or_default(project);
-            let body = CreateRoleRequest { title: title.clone(), content };
+            let body = CreateRoleRequest {
+                title: title.clone(),
+                content,
+            };
             post_json(&format!("/v1/projects/{project}/roles"), &body).await?;
             println!("role '{title}' created");
         }
@@ -89,9 +97,20 @@ pub async fn role(cmd: RoleCmd) -> anyhow::Result<()> {
 
 pub async fn skill(cmd: SkillCmd) -> anyhow::Result<()> {
     match cmd {
-        SkillCmd::Create { name, content, description, kind, project } => {
+        SkillCmd::Create {
+            name,
+            content,
+            description,
+            kind,
+            project,
+        } => {
             let project = project_or_default(project);
-            let body = CreateSkillRequest { name: name.clone(), description, content, kind };
+            let body = CreateSkillRequest {
+                name: name.clone(),
+                description,
+                content,
+                kind,
+            };
             post_json(&format!("/v1/projects/{project}/skills"), &body).await?;
             println!("skill '{name}' created");
         }

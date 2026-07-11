@@ -72,7 +72,7 @@ async fn dispatch_stdin_event(tool: &str, input: &str) -> anyhow::Result<()> {
         }
         "SessionStart" => session_start(tool, "SessionStart").await,
         "SubagentStop" => Ok(()), // see invariant above — silent, no wait, no ack
-        _ => Ok(()), // unknown event: succeed silently, never break the agent
+        _ => Ok(()),              // unknown event: succeed silently, never break the agent
     }
 }
 
@@ -389,7 +389,10 @@ const HERMES_WAIT_BUDGET_SECS: u64 = 290;
 
 async fn dispatch_hermes_event(input: &str) -> anyhow::Result<()> {
     let payload: serde_json::Value = serde_json::from_str(input).unwrap_or_default();
-    if payload["parent_session_id"].as_str().is_some_and(|p| !p.is_empty()) {
+    if payload["parent_session_id"]
+        .as_str()
+        .is_some_and(|p| !p.is_empty())
+    {
         println!("{{}}"); // G2 — never drain the parent's inbox from a subagent
         return Ok(());
     }
@@ -438,7 +441,10 @@ async fn dispatch_hermes_event(input: &str) -> anyhow::Result<()> {
             let budget = stop_timeout_secs().min(HERMES_WAIT_BUDGET_SECS);
             match collect_stop_within("hermes", budget).await {
                 Some(mut d) => {
-                    println!("{}", serde_json::json!({ "decision": "block", "reason": d.text }));
+                    println!(
+                        "{}",
+                        serde_json::json!({ "decision": "block", "reason": d.text })
+                    );
                     d.ack().await;
                 }
                 None => println!("{{}}"),
@@ -572,7 +578,9 @@ fn inject_state_path(name: &str) -> std::path::PathBuf {
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
         .collect();
-    config::kore_dir().join("inject").join(format!("{safe}.json"))
+    config::kore_dir()
+        .join("inject")
+        .join(format!("{safe}.json"))
 }
 
 fn load_inject_state(name: &str) -> InjectState {
@@ -586,7 +594,9 @@ fn save_inject_state(name: &str, st: &InjectState) {
     let path = inject_state_path(name);
     let Some(dir) = path.parent() else { return };
     let _ = std::fs::create_dir_all(dir);
-    let Ok(json) = serde_json::to_string(st) else { return };
+    let Ok(json) = serde_json::to_string(st) else {
+        return;
+    };
     // ponytail: tmp+rename for atomicity; last-writer-wins across racing hook
     // processes is fine — worst case a reminder lands one turn late.
     let tmp = path.with_extension("tmp");
@@ -619,7 +629,11 @@ fn advance_counter(
     now: u64,
     min_interval: u64,
 ) -> bool {
-    c.count += if cadence_kind == "tokens" { token_delta } else { turn_inc };
+    c.count += if cadence_kind == "tokens" {
+        token_delta
+    } else {
+        turn_inc
+    };
     let due = c.count >= cadence_value && now.saturating_sub(c.last_unix) >= min_interval;
     if due {
         c.count = 0;
@@ -641,8 +655,12 @@ fn transcript_token_delta(tool: &str, name: &str, st: &mut InjectState) -> i64 {
             st.transcript_path = Some(path.to_string_lossy().into_owned());
         }
     }
-    let Some(path) = st.transcript_path.clone() else { return 0 };
-    let Ok(meta) = std::fs::metadata(&path) else { return 0 };
+    let Some(path) = st.transcript_path.clone() else {
+        return 0;
+    };
+    let Ok(meta) = std::fs::metadata(&path) else {
+        return 0;
+    };
     let size = meta.len();
     // First observation sets the baseline — don't count pre-existing text.
     if st.transcript_bytes == 0 {
@@ -681,11 +699,19 @@ async fn seed_inject_state(name: &str) -> Option<String> {
     // Seed the role counter at "now" so its cadence measures from session start
     // and the role we inject here doesn't immediately re-fire on turn 1.
     if let Some(r) = cfg.items.iter().find(|i| i.kind == "role") {
-        st.counters
-            .insert(format!("role:{}", r.name), Counter { count: 0, last_unix: now });
+        st.counters.insert(
+            format!("role:{}", r.name),
+            Counter {
+                count: 0,
+                last_unix: now,
+            },
+        );
     }
     save_inject_state(name, &st);
-    cfg.items.iter().find(|i| i.kind == "role").map(format_inject_item)
+    cfg.items
+        .iter()
+        .find(|i| i.kind == "role")
+        .map(format_inject_item)
 }
 
 /// Self-assign role/skills from KORE_ROLE/KORE_SKILLS (set by `launch
@@ -693,7 +719,9 @@ async fn seed_inject_state(name: &str) -> Option<String> {
 /// token — the identity is naturally correct. Best-effort: specs were already
 /// validated at launch, and a failure here must never break the session.
 async fn self_assign_from_env() {
-    let Ok(token) = config::load_token() else { return };
+    let Ok(token) = config::load_token() else {
+        return;
+    };
     if let Ok(spec) = std::env::var("KORE_ROLE") {
         if let Ok((title, kind, value)) = crate::cadence::parse_role_spec(&spec) {
             let _ = config::http_client()
@@ -790,7 +818,9 @@ fn join_extra(text: &str, extra: &str) -> String {
 fn spawn_waker(_tool: &str) {} // waker pokes tmux/wezterm/kitty panes — unix-only
 #[cfg(unix)]
 fn spawn_waker(tool: &str) {
-    let Ok(exe) = std::env::current_exe() else { return };
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
     let ppid = std::os::unix::process::parent_id();
     let _ = std::process::Command::new(exe)
         .args(["waker", &auto_name(), &ppid.to_string(), tool])
@@ -830,11 +860,15 @@ async fn auto_register(tool: &str) -> anyhow::Result<()> {
 
 /// Fire-and-forget presence: never let a status update break the hook.
 async fn post_status(text: &str) {
-    let Ok(token) = config::load_token() else { return };
+    let Ok(token) = config::load_token() else {
+        return;
+    };
     let _ = config::http_client()
         .patch(format!("{}/v1/instances/self", config::server_url()))
         .bearer_auth(token)
-        .json(&kore_protocol::api::SetStatusRequest { status_context: text.to_string() })
+        .json(&kore_protocol::api::SetStatusRequest {
+            status_context: text.to_string(),
+        })
         .send()
         .await;
 }
@@ -859,8 +893,13 @@ async fn connect_or_register(tool: &str) -> anyhow::Result<ws::WsStream> {
 /// Stop/turn-end hook: wait for messages, deliver as block reason so the turn
 /// continues. The block JSON is identical for claude, codex and gemini.
 async fn stop_poll(tool: &str) -> anyhow::Result<()> {
-    let Some(mut d) = collect_stop(tool).await else { return Ok(()) };
-    println!("{}", serde_json::json!({ "decision": "block", "reason": d.text }));
+    let Some(mut d) = collect_stop(tool).await else {
+        return Ok(());
+    };
+    println!(
+        "{}",
+        serde_json::json!({ "decision": "block", "reason": d.text })
+    );
     d.ack().await; // after emit (D12): a death before this line = replay, not loss
     std::process::exit(2);
 }
@@ -881,10 +920,8 @@ struct WaitMarker(std::path::PathBuf);
 
 impl WaitMarker {
     fn engage() -> Option<Self> {
-        let path = config::agent_wait_path(
-            &auto_name(),
-            std::env::var("KORE_PROJECT").ok().as_deref(),
-        );
+        let path =
+            config::agent_wait_path(&auto_name(), std::env::var("KORE_PROJECT").ok().as_deref());
         std::fs::create_dir_all(path.parent()?).ok()?;
         std::fs::write(&path, b"").ok()?;
         Some(Self(path))
@@ -922,7 +959,11 @@ struct Drained {
 impl Drained {
     fn new(messages: &[Delivery], socket: ws::WsStream) -> Self {
         let last_id = messages.iter().map(|d| d.id).max().unwrap_or(0);
-        Self { text: format_messages(messages), last_id, socket }
+        Self {
+            text: format_messages(messages),
+            last_id,
+            socket,
+        }
     }
 
     /// Fire-and-forget: a failed ack just means re-delivery on reconnect.
@@ -988,8 +1029,7 @@ async fn collect_drain(tool: &str) -> Option<Drained> {
 
 /// Collect already-available deliveries (replayed backlog / in-flight burst).
 async fn drain_into(socket: &mut ws::WsStream, out: &mut Vec<Delivery>) {
-    while let Ok(Ok(Some(d))) =
-        tokio::time::timeout(DRAIN_WINDOW, ws::next_delivery(socket)).await
+    while let Ok(Ok(Some(d))) = tokio::time::timeout(DRAIN_WINDOW, ws::next_delivery(socket)).await
     {
         out.push(d);
     }
@@ -1008,14 +1048,21 @@ fn format_messages(messages: &[Delivery]) -> String {
         if let Some(b) = &d.message.bundle_id {
             meta.push(b.clone()); // ids are already "bundle:<8hex>"
         }
-        let meta = if meta.is_empty() { String::new() } else { format!(" ({})", meta.join(", ")) };
+        let meta = if meta.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", meta.join(", "))
+        };
         // Tag non-agent senders so the model knows a person (or the server)
         // is talking — untagged names are AI peers.
         let from = match d.message.sender_kind.as_str() {
             "agent" => d.message.from.clone(),
             kind => format!("{} [{kind}]", d.message.from),
         };
-        s.push_str(&format!("[#{}] {}{}: {}\n", d.id, from, meta, d.message.text));
+        s.push_str(&format!(
+            "[#{}] {}{}: {}\n",
+            d.id, from, meta, d.message.text
+        ));
     }
     s.push_str(
         "\nSenders tagged [human] are people — treat their messages like user \
@@ -1161,7 +1208,10 @@ pub fn install(tool: &str, user_scope: bool) -> anyhow::Result<()> {
         "kilo" | "kilocode" => install_ts_plugin("kilo", ".kilocode/plugins"),
         "cline" => install_cline(),
         "openclaw" => install_openclaw(),
-        other => anyhow::bail!("no hook support for tool '{other}' yet ({})", SUPPORTED_TOOLS.join("|")),
+        other => anyhow::bail!(
+            "no hook support for tool '{other}' yet ({})",
+            SUPPORTED_TOOLS.join("|")
+        ),
     }
 }
 
@@ -1191,9 +1241,7 @@ fn claude_base(user_scope: bool) -> anyhow::Result<std::path::PathBuf> {
 /// Merge kore hooks + the permission rule into a claude settings object.
 /// Pure so it's testable (round-trips with `strip_claude_kore`).
 fn merge_claude_hooks(settings: &mut serde_json::Value, exe: &str) -> anyhow::Result<()> {
-    let entry = |timeout: u64| {
-        serde_json::json!([{ "hooks": [{ "type": "command", "command": format!("{exe} hook claude"), "timeout": timeout }] }])
-    };
+    let entry = |timeout: u64| serde_json::json!([{ "hooks": [{ "type": "command", "command": format!("{exe} hook claude"), "timeout": timeout }] }]);
 
     let hooks = settings
         .as_object_mut()
@@ -1241,7 +1289,10 @@ fn install_claude(user_scope: bool) -> anyhow::Result<()> {
         .and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_else(|| serde_json::json!({}));
 
-    merge_claude_hooks(&mut settings, &std::env::current_exe()?.display().to_string())?;
+    merge_claude_hooks(
+        &mut settings,
+        &std::env::current_exe()?.display().to_string(),
+    )?;
 
     let rendered = serde_json::to_string_pretty(&settings)?;
     let skill_dir = base.join("skills/kore");
@@ -1341,11 +1392,10 @@ fn merge_gemini_hooks(settings: &mut serde_json::Value, exe: &str) {
 
     // Gemini needs both switches on or hooks never fire.
     root.entry("tools").or_insert_with(|| serde_json::json!({}))["enableHooks"] = true.into();
-    root.entry("hooksConfig").or_insert_with(|| serde_json::json!({}))["enabled"] = true.into();
+    root.entry("hooksConfig")
+        .or_insert_with(|| serde_json::json!({}))["enabled"] = true.into();
 
-    let hooks = root
-        .entry("hooks")
-        .or_insert_with(|| serde_json::json!({}));
+    let hooks = root.entry("hooks").or_insert_with(|| serde_json::json!({}));
     for &(event, suffix, timeout) in GEMINI_HOOKS {
         let arr = hooks[event].as_array().cloned().unwrap_or_default();
         let mut arr: Vec<serde_json::Value> = arr
@@ -1387,10 +1437,16 @@ fn install_gemini() -> anyhow::Result<()> {
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| serde_json::json!({}));
-    merge_gemini_hooks(&mut settings, &std::env::current_exe()?.display().to_string());
+    merge_gemini_hooks(
+        &mut settings,
+        &std::env::current_exe()?.display().to_string(),
+    );
     std::fs::create_dir_all(&dir)?;
     std::fs::write(&path, serde_json::to_string_pretty(&settings)?)?;
-    println!("kore installed: gemini hooks → {} (needs gemini ≥0.26)", path.display());
+    println!(
+        "kore installed: gemini hooks → {} (needs gemini ≥0.26)",
+        path.display()
+    );
     Ok(())
 }
 
@@ -1453,7 +1509,9 @@ fn install_antigravity() -> anyhow::Result<()> {
 /// gemini-cli's TOML policy engine (HC13, hcom 5f427b8). Lives beside the
 /// gemini dir under `antigravity-cli/`.
 fn antigravity_settings_path() -> std::path::PathBuf {
-    gemini_config_dir().join("antigravity-cli").join("settings.json")
+    gemini_config_dir()
+        .join("antigravity-cli")
+        .join("settings.json")
 }
 
 /// agy auto-approves `run_command` by matching `command(<prefix>)` entries in
@@ -1567,8 +1625,14 @@ fn install_codex() -> anyhow::Result<()> {
     // Failure is a WARN, not an error: hooks must never break the agent, and
     // older codex (<0.131, no app-server hooks/list) has no gate to satisfy.
     match ensure_codex_hooks_trusted() {
-        Ok(true) => println!("kore installed: codex hooks → {} (trusted for this codex build)", path.display()),
-        Ok(false) => println!("kore installed: codex hooks → {} (trust already current)", path.display()),
+        Ok(true) => println!(
+            "kore installed: codex hooks → {} (trusted for this codex build)",
+            path.display()
+        ),
+        Ok(false) => println!(
+            "kore installed: codex hooks → {} (trust already current)",
+            path.display()
+        ),
         Err(e) => println!(
             "kore installed: codex hooks → {} (WARN: trust registration failed: {e} — codex will prompt once, or launch with --dangerously-bypass-hook-trust)",
             path.display()
@@ -1593,7 +1657,9 @@ struct CodexTrustEntry {
 /// state entry so a codex upgrade (new hash inputs) re-triggers the fetch
 /// instead of leaving silently-dead hooks.
 fn codex_cli_version() -> anyhow::Result<String> {
-    let out = std::process::Command::new("codex").arg("--version").output()?;
+    let out = std::process::Command::new("codex")
+        .arg("--version")
+        .output()?;
     if !out.status.success() {
         anyhow::bail!("codex --version failed");
     }
@@ -1634,13 +1700,27 @@ fn ensure_codex_hooks_trusted() -> anyhow::Result<bool> {
 /// writes are always fresh; foreign edits get codex's trust prompt (same as
 /// before HC6).
 fn codex_trust_is_current(doc: &toml_edit::DocumentMut, version: &str) -> bool {
-    let Some(state) = doc.get("hooks").and_then(|h| h.get("state")).and_then(|s| s.as_table_like()) else {
+    let Some(state) = doc
+        .get("hooks")
+        .and_then(|h| h.get("state"))
+        .and_then(|s| s.as_table_like())
+    else {
         return false;
     };
-    ["session_start", "user_prompt_submit", "post_tool_use", "stop"].iter().all(|slot| {
+    [
+        "session_start",
+        "user_prompt_submit",
+        "post_tool_use",
+        "stop",
+    ]
+    .iter()
+    .all(|slot| {
         state.iter().any(|(key, item)| {
             key.contains(slot)
-                && item.get("trusted_hash").and_then(|v| v.as_str()).is_some_and(|h| !h.is_empty())
+                && item
+                    .get("trusted_hash")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(|h| !h.is_empty())
                 && item.get(KORE_CODEX_VERSION_KEY).and_then(|v| v.as_str()) == Some(version)
         })
     })
@@ -1648,14 +1728,20 @@ fn codex_trust_is_current(doc: &toml_edit::DocumentMut, version: &str) -> bool {
 
 /// Merge trust entries into config.toml, kore's keys only — toml_edit keeps
 /// every byte of the user's config intact (same rule as kimi's HC10 merge).
-fn write_codex_trust_state(doc: &mut toml_edit::DocumentMut, entries: &[CodexTrustEntry], version: &str) {
+fn write_codex_trust_state(
+    doc: &mut toml_edit::DocumentMut,
+    entries: &[CodexTrustEntry],
+    version: &str,
+) {
     if doc.get("hooks").is_none_or(|h| !h.is_table_like()) {
         doc["hooks"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
     if doc["hooks"].get("state").is_none_or(|s| !s.is_table_like()) {
         doc["hooks"]["state"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
-    let state = doc["hooks"]["state"].as_table_like_mut().expect("just ensured");
+    let state = doc["hooks"]["state"]
+        .as_table_like_mut()
+        .expect("just ensured");
     for e in entries {
         if state.get(&e.key).is_none_or(|i| !i.is_table_like()) {
             state.insert(&e.key, toml_edit::Item::Table(toml_edit::Table::new()));
@@ -1679,37 +1765,59 @@ fn fetch_codex_hook_entries(command: &str) -> anyhow::Result<Vec<CodexTrustEntry
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()?;
-    let mut stdin = child.stdin.take().ok_or_else(|| anyhow::anyhow!("no app-server stdin"))?;
-    let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("no app-server stdout"))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("no app-server stdin"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("no app-server stdout"))?;
     let mut reader = std::io::BufReader::new(stdout);
 
-    let read_response = |reader: &mut std::io::BufReader<std::process::ChildStdout>, id: u64| -> anyhow::Result<serde_json::Value> {
+    let read_response = |reader: &mut std::io::BufReader<std::process::ChildStdout>,
+                         id: u64|
+     -> anyhow::Result<serde_json::Value> {
         let mut line = String::new();
         loop {
             line.clear();
             if reader.read_line(&mut line)? == 0 {
                 anyhow::bail!("codex app-server closed before responding (id {id})");
             }
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else {
+                continue;
+            };
             if v.get("id").and_then(|i| i.as_u64()) == Some(id) {
                 return Ok(v);
             }
         }
     };
 
-    writeln!(stdin, "{}", serde_json::json!({
-        "method": "initialize", "id": 1,
-        "params": {
-            "clientInfo": {"name": "kore-client", "title": "kore", "version": env!("CARGO_PKG_VERSION")},
-            "capabilities": {"experimentalApi": true}
-        }
-    }))?;
+    writeln!(
+        stdin,
+        "{}",
+        serde_json::json!({
+            "method": "initialize", "id": 1,
+            "params": {
+                "clientInfo": {"name": "kore-client", "title": "kore", "version": env!("CARGO_PKG_VERSION")},
+                "capabilities": {"experimentalApi": true}
+            }
+        })
+    )?;
     read_response(&mut reader, 1)?;
-    writeln!(stdin, "{}", serde_json::json!({"method": "initialized", "params": {}}))?;
+    writeln!(
+        stdin,
+        "{}",
+        serde_json::json!({"method": "initialized", "params": {}})
+    )?;
     let cwd = std::env::current_dir()?;
-    writeln!(stdin, "{}", serde_json::json!({
-        "method": "hooks/list", "id": 2, "params": {"cwds": [cwd]}
-    }))?;
+    writeln!(
+        stdin,
+        "{}",
+        serde_json::json!({
+            "method": "hooks/list", "id": 2, "params": {"cwds": [cwd]}
+        })
+    )?;
     stdin.flush()?;
     let resp = read_response(&mut reader, 2);
     drop(stdin);
@@ -1731,7 +1839,10 @@ fn fetch_codex_hook_entries(command: &str) -> anyhow::Result<Vec<CodexTrustEntry
         })
         .collect::<Vec<_>>();
     if hooks.len() < 4 {
-        anyhow::bail!("hooks/list returned {} kore hooks, expected 4 — hooks.json not picked up?", hooks.len());
+        anyhow::bail!(
+            "hooks/list returned {} kore hooks, expected 4 — hooks.json not picked up?",
+            hooks.len()
+        );
     }
     Ok(hooks)
 }
@@ -1751,8 +1862,9 @@ const CURSOR_HOOK_EVENTS: &[(&str, u64)] = &[
 /// Auto-approved kore verbs (cursor permission rules, copilot
 /// PermissionRequest) — the read-and-send surface only; kill/unregister stay
 /// behind D10's --go and human hands.
-const SAFE_KORE_VERBS: &[&str] =
-    &["send", "list", "history", "listen", "events", "threads", "bundle"];
+const SAFE_KORE_VERBS: &[&str] = &[
+    "send", "list", "history", "listen", "events", "threads", "bundle",
+];
 
 fn cursor_home() -> std::path::PathBuf {
     dirs::home_dir().unwrap_or_default().join(".cursor")
@@ -1879,7 +1991,7 @@ fn install_cursor() -> anyhow::Result<()> {
 const COPILOT_HOOK_EVENTS: &[(&str, u64)] = &[
     ("SessionStart", 30),
     ("Stop", 86400),
-    ("PostToolUse", 30),      // W1 mid-turn drain
+    ("PostToolUse", 30),       // W1 mid-turn drain
     ("PermissionRequest", 30), // auto-allow safe kore-client commands
 ];
 
@@ -1920,11 +2032,8 @@ fn install_copilot() -> anyhow::Result<()> {
 /// Kimi events kore wires (config.toml `[[hooks]]` entries; `event` = the
 /// PascalCase name, `command` carries `kimi-<lower>` argv). Stop is the
 /// blocking wait → generous timeout.
-const KIMI_HOOK_EVENTS: &[(&str, u64)] = &[
-    ("SessionStart", 30),
-    ("PostToolUse", 30),
-    ("Stop", 86400),
-];
+const KIMI_HOOK_EVENTS: &[(&str, u64)] =
+    &[("SessionStart", 30), ("PostToolUse", 30), ("Stop", 86400)];
 
 fn kimi_config_dir() -> std::path::PathBuf {
     match std::env::var("KIMI_CODE_HOME") {
@@ -1955,7 +2064,7 @@ fn kimi_permission_patterns() -> Vec<String> {
 /// Merge kore's `[[hooks]]` + `[[permission.rules]]` into kimi's config.toml,
 /// leaving every user entry intact. Idempotent (kore rows replaced by marker).
 fn kimi_merge(doc: &mut toml_edit::DocumentMut, exe: &str) {
-    use toml_edit::{value, ArrayOfTables, Item, Table};
+    use toml_edit::{ArrayOfTables, Item, Table, value};
 
     let hooks = doc
         .entry("hooks")
@@ -1964,7 +2073,10 @@ fn kimi_merge(doc: &mut toml_edit::DocumentMut, exe: &str) {
         let mut kept = ArrayOfTables::new();
         for i in 0..arr.len() {
             if let Some(t) = arr.get(i) {
-                let ours = t.get("command").and_then(|v| v.as_str()).is_some_and(is_kore_kimi_command);
+                let ours = t
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(is_kore_kimi_command);
                 if !ours {
                     kept.push(t.clone());
                 }
@@ -2000,7 +2112,9 @@ fn kimi_merge(doc: &mut toml_edit::DocumentMut, exe: &str) {
             }
             for i in 0..arr.len() {
                 if let Some(t) = arr.get(i) {
-                    let ours = t.get("pattern").and_then(|v| v.as_str())
+                    let ours = t
+                        .get("pattern")
+                        .and_then(|v| v.as_str())
                         .is_some_and(|p| kimi_permission_patterns().iter().any(|k| k == p));
                     if !ours {
                         rebuilt.push(t.clone());
@@ -2018,7 +2132,11 @@ fn kimi_strip(doc: &mut toml_edit::DocumentMut) {
         let mut kept = ArrayOfTables::new();
         for i in 0..arr.len() {
             if let Some(t) = arr.get(i) {
-                if !t.get("command").and_then(|v| v.as_str()).is_some_and(is_kore_kimi_command) {
+                if !t
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(is_kore_kimi_command)
+                {
                     kept.push(t.clone());
                 }
             }
@@ -2033,7 +2151,9 @@ fn kimi_strip(doc: &mut toml_edit::DocumentMut) {
             let mut kept = ArrayOfTables::new();
             for i in 0..arr.len() {
                 if let Some(t) = arr.get(i) {
-                    let ours = t.get("pattern").and_then(|v| v.as_str())
+                    let ours = t
+                        .get("pattern")
+                        .and_then(|v| v.as_str())
                         .is_some_and(|p| kimi_permission_patterns().iter().any(|k| k == p));
                     if !ours {
                         kept.push(t.clone());
@@ -2120,7 +2240,10 @@ fn hermes_marker_range(text: &str) -> Option<std::ops::Range<usize>> {
     let b = text.find(HERMES_MARK_BEGIN_PREFIX)?;
     let start = text[..b].rfind('\n').map(|i| i + 1).unwrap_or(0);
     let e = b + text[b..].find(HERMES_MARK_END)?;
-    let end = text[e..].find('\n').map(|i| e + i + 1).unwrap_or(text.len());
+    let end = text[e..]
+        .find('\n')
+        .map(|i| e + i + 1)
+        .unwrap_or(text.len());
     Some(start..end)
 }
 
@@ -2199,7 +2322,11 @@ fn update_hermes_allowlist(add: bool) -> anyhow::Result<()> {
         *approvals = serde_json::json!([]);
     }
     let arr = approvals.as_array_mut().unwrap();
-    arr.retain(|e| !e["command"].as_str().is_some_and(|c| c.contains(" hook hermes")));
+    arr.retain(|e| {
+        !e["command"]
+            .as_str()
+            .is_some_and(|c| c.contains(" hook hermes"))
+    });
     if add {
         let now = iso8601_utc(std::time::SystemTime::now());
         let mtime = std::fs::metadata(&exe)
@@ -2306,7 +2433,10 @@ fn pi_extensions_dir(tool: &str) -> std::path::PathBuf {
 fn pi_plugin_source(tool: &str) -> String {
     if tool == "omp" {
         PI_PLUGIN
-            .replace("@earendil-works/pi-coding-agent", "@oh-my-pi/pi-coding-agent")
+            .replace(
+                "@earendil-works/pi-coding-agent",
+                "@oh-my-pi/pi-coding-agent",
+            )
             .replace("const TOOL = \"pi\"", "const TOOL = \"omp\"")
     } else {
         PI_PLUGIN.to_string()
@@ -2481,7 +2611,23 @@ fn install_openclaw() -> anyhow::Result<()> {
 // Uninstall is surgical: only kore entries leave shared config files;
 // everything the user put there survives.
 
-const SUPPORTED_TOOLS: &[&str] = &["claude", "gemini", "antigravity", "codex", "centaury", "cursor", "copilot", "kimi", "hermes", "pi", "omp", "opencode", "kilo", "cline", "openclaw"];
+const SUPPORTED_TOOLS: &[&str] = &[
+    "claude",
+    "gemini",
+    "antigravity",
+    "codex",
+    "centaury",
+    "cursor",
+    "copilot",
+    "kimi",
+    "hermes",
+    "pi",
+    "omp",
+    "opencode",
+    "kilo",
+    "cline",
+    "openclaw",
+];
 
 fn read_json(path: &std::path::Path) -> Option<serde_json::Value> {
     serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
@@ -2568,8 +2714,8 @@ fn tool_status(tool: &str, user_scope: bool) -> anyhow::Result<(std::path::PathB
         "claude" => {
             let path = claude_base(user_scope)?.join("settings.json");
             let events: Vec<&str> = CLAUDE_HOOK_EVENTS.iter().map(|&(e, _)| e).collect();
-            let installed = read_json(&path)
-                .is_some_and(|v| settings_has_kore(&v, &events, "hook claude"));
+            let installed =
+                read_json(&path).is_some_and(|v| settings_has_kore(&v, &events, "hook claude"));
             (path, installed)
         }
         "gemini" => {
@@ -2591,8 +2737,8 @@ fn tool_status(tool: &str, user_scope: bool) -> anyhow::Result<(std::path::PathB
         "centaury" => {
             let path = centaury_hooks_path();
             let events: Vec<&str> = CLAUDE_HOOK_EVENTS.iter().map(|&(e, _)| e).collect();
-            let installed = read_json(&path)
-                .is_some_and(|v| settings_has_kore(&v, &events, "hook centaury"));
+            let installed =
+                read_json(&path).is_some_and(|v| settings_has_kore(&v, &events, "hook centaury"));
             (path, installed)
         }
         "cursor" | "cursor-agent" => {
@@ -2613,8 +2759,8 @@ fn tool_status(tool: &str, user_scope: bool) -> anyhow::Result<(std::path::PathB
         }
         "hermes" => {
             let path = hermes_config_path();
-            let installed = std::fs::read_to_string(&path)
-                .is_ok_and(|s| hermes_marker_range(&s).is_some());
+            let installed =
+                std::fs::read_to_string(&path).is_ok_and(|s| hermes_marker_range(&s).is_some());
             (path, installed)
         }
         "pi" | "omp" => {
@@ -2664,7 +2810,9 @@ fn strip_json_file(
     path: &std::path::Path,
     strip: impl FnOnce(&mut serde_json::Value),
 ) -> anyhow::Result<()> {
-    let Some(mut v) = read_json(path) else { return Ok(()) };
+    let Some(mut v) = read_json(path) else {
+        return Ok(());
+    };
     strip(&mut v);
     std::fs::write(path, serde_json::to_string_pretty(&v)?)?;
     Ok(())
@@ -2759,22 +2907,36 @@ mod tests {
             "model = \"o4\"\n[hooks.state.\"/x/hooks.json:pre_tool_use:0:0\"]\ntrusted_hash = \"sha256:foreign\"\n"
                 .parse()
                 .unwrap();
-        assert!(!codex_trust_is_current(&doc, "0.143.0"), "foreign entry must not satisfy kore's slots");
+        assert!(
+            !codex_trust_is_current(&doc, "0.143.0"),
+            "foreign entry must not satisfy kore's slots"
+        );
 
-        let entries: Vec<CodexTrustEntry> = ["session_start", "user_prompt_submit", "post_tool_use", "stop"]
-            .iter()
-            .map(|slot| CodexTrustEntry {
-                key: format!("/x/hooks.json:{slot}:0:0"),
-                current_hash: format!("sha256:{slot}"),
-            })
-            .collect();
+        let entries: Vec<CodexTrustEntry> = [
+            "session_start",
+            "user_prompt_submit",
+            "post_tool_use",
+            "stop",
+        ]
+        .iter()
+        .map(|slot| CodexTrustEntry {
+            key: format!("/x/hooks.json:{slot}:0:0"),
+            current_hash: format!("sha256:{slot}"),
+        })
+        .collect();
         write_codex_trust_state(&mut doc, &entries, "0.143.0");
 
         assert!(codex_trust_is_current(&doc, "0.143.0"));
-        assert!(!codex_trust_is_current(&doc, "0.144.0"), "codex upgrade must invalidate");
+        assert!(
+            !codex_trust_is_current(&doc, "0.144.0"),
+            "codex upgrade must invalidate"
+        );
         let out = doc.to_string();
         assert!(out.contains("model = \"o4\""), "user config survives");
-        assert!(out.contains("sha256:foreign"), "foreign hook entry survives");
+        assert!(
+            out.contains("sha256:foreign"),
+            "foreign hook entry survives"
+        );
         assert!(out.contains("[hooks.state.\"/x/hooks.json:stop:0:0\"]"));
     }
 
@@ -2794,8 +2956,15 @@ mod tests {
         openclaw_enable(&mut cfg, kore).unwrap();
         let paths = cfg["plugins"]["load"]["paths"].as_array().unwrap();
         assert!(paths.iter().any(|p| p.as_str() == Some(kore)));
-        assert!(paths.iter().any(|p| p.as_str() == Some("/home/u/my-plugin.ts")));
-        assert_eq!(cfg["plugins"]["entries"]["kore"]["enabled"], serde_json::json!(true));
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.as_str() == Some("/home/u/my-plugin.ts"))
+        );
+        assert_eq!(
+            cfg["plugins"]["entries"]["kore"]["enabled"],
+            serde_json::json!(true)
+        );
 
         // Idempotent: re-enable must not duplicate the load-path.
         openclaw_enable(&mut cfg, kore).unwrap();
@@ -2809,8 +2978,14 @@ mod tests {
     fn openclaw_enable_from_empty_config() {
         let mut cfg = serde_json::json!({});
         openclaw_enable(&mut cfg, "/p/kore.ts").unwrap();
-        assert_eq!(cfg["plugins"]["entries"]["kore"]["enabled"], serde_json::json!(true));
-        assert_eq!(cfg["plugins"]["load"]["paths"][0], serde_json::json!("/p/kore.ts"));
+        assert_eq!(
+            cfg["plugins"]["entries"]["kore"]["enabled"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            cfg["plugins"]["load"]["paths"][0],
+            serde_json::json!("/p/kore.ts")
+        );
     }
 
     #[test]
@@ -2869,13 +3044,19 @@ mod tests {
         assert!(cursor_has_kore(&s));
         let stops = s["hooks"]["stop"].as_array().unwrap();
         let kore_stop = stops.iter().find(|e| is_kore_cursor_entry(e)).unwrap();
-        assert!(kore_stop["loop_limit"].is_null(), "stop needs loop_limit: null");
+        assert!(
+            kore_stop["loop_limit"].is_null(),
+            "stop needs loop_limit: null"
+        );
 
         // Re-install is idempotent (old entry replaced, not duplicated).
         merge_cursor_hooks(&mut s, "/moved/kore-client");
         let kore_stops = s["hooks"]["stop"]
-            .as_array().unwrap()
-            .iter().filter(|e| is_kore_cursor_entry(e)).count();
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| is_kore_cursor_entry(e))
+            .count();
         assert_eq!(kore_stops, 1);
 
         strip_cursor_kore(&mut s);
@@ -2890,7 +3071,12 @@ mod tests {
             let entry = &v["hooks"][*event][0];
             assert_eq!(entry["type"], "command");
             assert!(entry["timeoutSec"].is_u64());
-            assert!(entry["command"].as_str().unwrap().contains(" hook copilot "));
+            assert!(
+                entry["command"]
+                    .as_str()
+                    .unwrap()
+                    .contains(" hook copilot ")
+            );
         }
         // Stop gets the generous blocking-wait budget.
         assert_eq!(v["hooks"]["Stop"][0]["timeoutSec"], 86400);
@@ -2946,8 +3132,14 @@ mod tests {
         let omp = pi_plugin_source("omp");
         assert!(omp.contains("@oh-my-pi/pi-coding-agent"));
         assert!(omp.contains("const TOOL = \"omp\""));
-        assert!(!omp.contains("@earendil-works/pi-coding-agent"), "import must be rewritten");
-        assert!(!omp.contains("const TOOL = \"pi\""), "TOOL must be rewritten");
+        assert!(
+            !omp.contains("@earendil-works/pi-coding-agent"),
+            "import must be rewritten"
+        );
+        assert!(
+            !omp.contains("const TOOL = \"pi\""),
+            "TOOL must be rewritten"
+        );
     }
 
     #[test]
@@ -2967,7 +3159,11 @@ mod tests {
                 bundle_id: None,
             },
         };
-        let s = format_messages(&[mk("luna", "agent"), mk("solar", "human"), mk("kore", "system")]);
+        let s = format_messages(&[
+            mk("luna", "agent"),
+            mk("solar", "human"),
+            mk("kore", "system"),
+        ]);
         assert!(s.contains("luna: hi"), "agents stay untagged");
         assert!(!s.contains("[agent]"));
         assert!(s.contains("solar [human]: hi"));
@@ -3026,7 +3222,12 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .filter(|e| e["hooks"][0]["name"].as_str().unwrap_or("").starts_with("kore-"))
+                .filter(|e| {
+                    e["hooks"][0]["name"]
+                        .as_str()
+                        .unwrap_or("")
+                        .starts_with("kore-")
+                })
                 .collect();
             assert_eq!(kore.len(), 1, "{event} duplicated");
             assert_eq!(
@@ -3047,9 +3248,18 @@ mod tests {
         assert!(root["other-group"].is_object(), "foreign groups survive");
         let kl = &root["kore-lifecycle"];
         assert_eq!(kl["PreInvocation"].as_array().unwrap().len(), 2);
-        assert_eq!(kl["PreInvocation"][0]["command"], "/bin/kore-client hook antigravity sessionstart");
-        assert_eq!(kl["PreInvocation"][1]["command"], "/bin/kore-client hook antigravity beforeagent");
-        assert_eq!(kl["PostInvocation"][0]["command"], "/bin/kore-client hook antigravity afteragent");
+        assert_eq!(
+            kl["PreInvocation"][0]["command"],
+            "/bin/kore-client hook antigravity sessionstart"
+        );
+        assert_eq!(
+            kl["PreInvocation"][1]["command"],
+            "/bin/kore-client hook antigravity beforeagent"
+        );
+        assert_eq!(
+            kl["PostInvocation"][0]["command"],
+            "/bin/kore-client hook antigravity afteragent"
+        );
         assert_eq!(kl["PostInvocation"][0]["timeout"], 86400); // blocking wait
         assert_eq!(kl["PreInvocation"][0]["type"], "command");
     }
@@ -3064,10 +3274,16 @@ mod tests {
         merge_antigravity_permissions(&mut root, true);
         merge_antigravity_permissions(&mut root, true); // idempotent: no dup
         let allow = root["permissions"]["allow"].as_array().unwrap();
-        assert!(allow.iter().any(|e| e == "command(ls)"), "user rule survives");
+        assert!(
+            allow.iter().any(|e| e == "command(ls)"),
+            "user rule survives"
+        );
         assert!(allow.iter().any(|e| e == "command(kore-client send)"));
         assert_eq!(
-            allow.iter().filter(|e| *e == "command(kore-client send)").count(),
+            allow
+                .iter()
+                .filter(|e| *e == "command(kore-client send)")
+                .count(),
             1,
             "no duplicate on re-install"
         );
@@ -3075,13 +3291,20 @@ mod tests {
         merge_antigravity_permissions(&mut root, false);
         assert_eq!(root["theme"], "dark", "unrelated keys untouched");
         let allow = root["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow, &vec![serde_json::json!("command(ls)")], "only kore rules removed");
+        assert_eq!(
+            allow,
+            &vec![serde_json::json!("command(ls)")],
+            "only kore rules removed"
+        );
 
         // With no user rules left, removal cleans the empty scaffolding.
         let mut bare = serde_json::json!({});
         merge_antigravity_permissions(&mut bare, true);
         merge_antigravity_permissions(&mut bare, false);
-        assert!(bare.get("permissions").is_none(), "empty permissions cleaned");
+        assert!(
+            bare.get("permissions").is_none(),
+            "empty permissions cleaned"
+        );
     }
 
     /// kilo = opencode fork: the single plugin source must fully rewrite to
@@ -3112,7 +3335,11 @@ mod tests {
 
         // fake kore-client: multiline output with JSON-hostile characters
         let fake = base.join("kore-client");
-        std::fs::write(&fake, "#!/bin/sh\nprintf 'say \"hi\" to C:\\\\path\\nline two\\n'\n").unwrap();
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\nprintf 'say \"hi\" to C:\\\\path\\nline two\\n'\n",
+        )
+        .unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let script = base.join("TaskStart");
@@ -3121,14 +3348,19 @@ mod tests {
 
         // base first so the fake kore-client shadows any real one; the rest
         // of PATH stays for sh/awk.
-        let path = format!("{}:{}", base.display(), std::env::var("PATH").unwrap_or_default());
+        let path = format!(
+            "{}:{}",
+            base.display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
         let out = std::process::Command::new("/bin/sh")
             .arg(&script)
             .env("PATH", &path)
             .stdin(std::process::Stdio::null())
             .output()
             .unwrap();
-        let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("script must print valid JSON");
+        let v: serde_json::Value =
+            serde_json::from_slice(&out.stdout).expect("script must print valid JSON");
         assert_eq!(v["cancel"], false);
         assert_eq!(v["contextModification"], "say \"hi\" to C:\\path\nline two");
 
@@ -3154,7 +3386,10 @@ mod tests {
             assert!(path.exists(), "marker present during wait");
             assert!(wait_marker_active("testwait", None));
             unsafe { std::env::set_var("KORE_HOOK_TIMEOUT", "0") };
-            assert!(!wait_marker_active("testwait", None), "stale marker treated absent");
+            assert!(
+                !wait_marker_active("testwait", None),
+                "stale marker treated absent"
+            );
             unsafe { std::env::remove_var("KORE_HOOK_TIMEOUT") };
         }
         assert!(!path.exists(), "marker gone after wait");
@@ -3199,8 +3434,7 @@ mod tests {
         assert_eq!(root["other"], true, "foreign keys survive");
         for event in ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"] {
             assert_eq!(
-                root["hooks"][event][0]["hooks"][0]["command"],
-                "/bin/kore-client hook codex",
+                root["hooks"][event][0]["hooks"][0]["command"], "/bin/kore-client hook codex",
                 "{event} missing"
             );
         }
@@ -3226,7 +3460,11 @@ mod tests {
         assert!(!remerged.contains("/bin/kore-client"));
 
         let stripped = hermes_strip_config(&remerged);
-        assert_eq!(stripped.trim_end(), original.trim_end(), "strip restores the file");
+        assert_eq!(
+            stripped.trim_end(),
+            original.trim_end(),
+            "strip restores the file"
+        );
     }
 
     #[test]
@@ -3234,14 +3472,21 @@ mod tests {
         // The shipped default `hooks: {}` is swapped in place, not duplicated.
         let cfg = "a: 1\nhooks: {}\nb: 2\n";
         let merged = hermes_merge_config(cfg, "/bin/kore-client").unwrap();
-        assert_eq!(merged.matches("\nhooks:").count() + usize::from(merged.starts_with("hooks:")), 1, "no duplicate hooks key");
+        assert_eq!(
+            merged.matches("\nhooks:").count() + usize::from(merged.starts_with("hooks:")),
+            1,
+            "no duplicate hooks key"
+        );
         assert!(merged.contains("a: 1\n") && merged.contains("b: 2\n"));
 
         // A real user hooks block is never rewritten — the Err carries the
         // paste-ready YAML instead.
         let foreign = "hooks:\n  pre_tool_call:\n  - command: \"my-guard\"\n";
         let err = hermes_merge_config(foreign, "/bin/kore-client").unwrap_err();
-        assert!(err.to_string().contains("hook hermes"), "error must carry the YAML");
+        assert!(
+            err.to_string().contains("hook hermes"),
+            "error must carry the YAML"
+        );
     }
 
     /// G2 pin, hermes-shaped: payloads carrying parent_session_id (delegate
@@ -3279,7 +3524,10 @@ mod tests {
         update_hermes_allowlist(true).unwrap(); // idempotent: no duplicate rows
         let v = read_json(&dir.join("shell-hooks-allowlist.json")).unwrap();
         let arr = v["approvals"].as_array().unwrap();
-        assert!(arr.iter().any(|e| e["command"] == "my-guard"), "foreign row survives");
+        assert!(
+            arr.iter().any(|e| e["command"] == "my-guard"),
+            "foreign row survives"
+        );
         let kore: Vec<_> = arr
             .iter()
             .filter(|e| e["command"].as_str().unwrap_or("").contains(" hook hermes"))
@@ -3292,7 +3540,11 @@ mod tests {
 
         update_hermes_allowlist(false).unwrap();
         let v = read_json(&dir.join("shell-hooks-allowlist.json")).unwrap();
-        assert_eq!(v["approvals"].as_array().unwrap().len(), 1, "only kore rows removed");
+        assert_eq!(
+            v["approvals"].as_array().unwrap().len(),
+            1,
+            "only kore rows removed"
+        );
         unsafe { std::env::remove_var("HERMES_HOME") };
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -3304,7 +3556,13 @@ mod tests {
         assert_eq!(iso8601_utc(t), "2024-10-27T03:33:20Z");
     }
 
-    fn inject_item(kind: &str, name: &str, mode: &str, cadence_kind: &str, cadence_value: i64) -> InjectItem {
+    fn inject_item(
+        kind: &str,
+        name: &str,
+        mode: &str,
+        cadence_kind: &str,
+        cadence_value: i64,
+    ) -> InjectItem {
         InjectItem {
             kind: kind.into(),
             name: name.into(),
@@ -3358,6 +3616,9 @@ mod tests {
         assert!(!s.contains("BODY"), "pointer omits the body");
 
         let full = inject_item("skill", "graphify", "full", "messages", 15);
-        assert!(format_inject_item(&full).contains("BODY"), "full includes the body");
+        assert!(
+            format_inject_item(&full).contains("BODY"),
+            "full includes the body"
+        );
     }
 }

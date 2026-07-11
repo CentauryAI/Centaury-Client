@@ -9,7 +9,11 @@ mod ws;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "kore-client", version, about = "kore thin client — connect AI agents to kore cloud")]
+#[command(
+    name = "kore-client",
+    version,
+    about = "kore thin client — connect AI agents to kore cloud"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -231,7 +235,10 @@ pub async fn do_register(
     owner: Option<String>,
 ) -> anyhow::Result<()> {
     let resp = config::http_client()
-        .post(format!("{}/v1/auth/register-instance", config::server_url()))
+        .post(format!(
+            "{}/v1/auth/register-instance",
+            config::server_url()
+        ))
         .json(&kore_protocol::api::RegisterRequest {
             name: name.to_string(),
             reg_secret: config::reg_secret()?,
@@ -239,14 +246,20 @@ pub async fn do_register(
             project: project.map(String::from),
             tag: std::env::var("KORE_TAG").ok().filter(|t| !t.is_empty()),
             tool: Some(tool.to_string()),
-            directory: std::env::current_dir().ok().map(|d| d.display().to_string()),
+            directory: std::env::current_dir()
+                .ok()
+                .map(|d| d.display().to_string()),
             owner,
         })
         .send()
         .await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("register failed ({}): {}", resp.status(), resp.text().await?);
+        anyhow::bail!(
+            "register failed ({}): {}",
+            resp.status(),
+            resp.text().await?
+        );
     }
 
     let body: kore_protocol::api::RegisterResponse = resp.json().await?;
@@ -270,7 +283,9 @@ fn gate_destructive(verb: &str, target: &str, go: bool) -> anyhow::Result<()> {
 /// not turn a working command into a failing one.
 async fn print_unread_hint() {
     commands::update::print_hint().await;
-    let Ok(token) = config::load_token() else { return };
+    let Ok(token) = config::load_token() else {
+        return;
+    };
     let Ok(resp) = config::http_client()
         .get(format!("{}/v1/messages/unread", config::server_url()))
         .bearer_auth(token)
@@ -283,7 +298,9 @@ async fn print_unread_hint() {
     if !resp.status().is_success() {
         return;
     }
-    let Ok(v) = resp.json::<kore_protocol::api::UnreadResponse>().await else { return };
+    let Ok(v) = resp.json::<kore_protocol::api::UnreadResponse>().await else {
+        return;
+    };
     if v.count > 0 {
         println!("[kore] {} unread — kore-client history", v.count);
     }
@@ -307,14 +324,25 @@ async fn main() -> anyhow::Result<()> {
 
     // bare `kore-client` → TUI, like legacy bare `kore`
     match cli.command.unwrap_or(Commands::Tui) {
-        Commands::Register { name, project, tool, owner } => {
+        Commands::Register {
+            name,
+            project,
+            tool,
+            owner,
+        } => {
             do_register(&name, project.as_deref(), &tool, owner).await?;
             match project {
-                Some(p) => println!("registered as '{name}' in project '{p}' — export KORE_PROJECT={p} to use this identity"),
+                Some(p) => println!(
+                    "registered as '{name}' in project '{p}' — export KORE_PROJECT={p} to use this identity"
+                ),
                 None => println!("registered as '{name}'"),
             }
         }
-        Commands::Signup { email, name, business } => commands::auth::signup(email, name, business).await?,
+        Commands::Signup {
+            email,
+            name,
+            business,
+        } => commands::auth::signup(email, name, business).await?,
         Commands::Login { email } => commands::auth::login(email).await?,
         Commands::Human { project } => commands::auth::human(project).await?,
         Commands::Launch(args) => commands::launch::run(args).await?,
@@ -325,7 +353,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Skill(cmd) => commands::roles::skill(cmd).await?,
         Commands::Tui => tui::run().await?,
         Commands::Projects => {
-            let projects: Vec<kore_protocol::api::ProjectSummary> = get_json("/v1/projects").await?;
+            let projects: Vec<kore_protocol::api::ProjectSummary> =
+                get_json("/v1/projects").await?;
             for p in projects {
                 println!("{:<20} {} agents", p.name, p.instance_count);
             }
@@ -335,22 +364,30 @@ async fn main() -> anyhow::Result<()> {
             commands::send::run(args).await?;
             print_unread_hint().await;
         }
-        Commands::Listen { secs, timeout, json } => {
-            ws::listen(secs.unwrap_or(timeout), json).await?
-        }
+        Commands::Listen {
+            secs,
+            timeout,
+            json,
+        } => ws::listen(secs.unwrap_or(timeout), json).await?,
         Commands::List { name, json, names } => {
-            let instances: Vec<kore_protocol::api::InstanceSummary> = get_json("/v1/instances").await?;
+            let instances: Vec<kore_protocol::api::InstanceSummary> =
+                get_json("/v1/instances").await?;
             // HC4: `list <name>` = detail card for one agent. Match base name
             // or the "{tag}-{name}" display form; the server already returns
             // every field the card shows, so this stays client-only.
             if let Some(target) = name {
                 let hit = instances.iter().find(|i| {
                     i.name == target
-                        || i.tag.as_deref().filter(|t| !t.is_empty())
-                            .map(|t| format!("{t}-{}", i.name)) == Some(target.clone())
+                        || i.tag
+                            .as_deref()
+                            .filter(|t| !t.is_empty())
+                            .map(|t| format!("{t}-{}", i.name))
+                            == Some(target.clone())
                 });
                 let Some(i) = hit else {
-                    eprintln!("no agent '{target}' in your project — `kore-client list` to see the roster");
+                    eprintln!(
+                        "no agent '{target}' in your project — `kore-client list` to see the roster"
+                    );
                     std::process::exit(1);
                 };
                 if json {
@@ -367,11 +404,26 @@ async fn main() -> anyhow::Result<()> {
                     _ => "agent".to_string(),
                 };
                 println!("{shown}");
-                println!("  status:    {}{}", i.status,
-                    if i.status_context.is_empty() { String::new() } else { format!(" ({})", i.status_context) });
+                println!(
+                    "  status:    {}{}",
+                    i.status,
+                    if i.status_context.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({})", i.status_context)
+                    }
+                );
                 println!("  kind:      {who}");
-                if let Some(t) = &i.tool { if !t.is_empty() { println!("  tool:      {t}"); } }
-                if let Some(d) = &i.directory { if !d.is_empty() { println!("  directory: {d}"); } }
+                if let Some(t) = &i.tool {
+                    if !t.is_empty() {
+                        println!("  tool:      {t}");
+                    }
+                }
+                if let Some(d) = &i.directory {
+                    if !d.is_empty() {
+                        println!("  directory: {d}");
+                    }
+                }
                 return Ok(());
             }
             if json {
@@ -403,8 +455,11 @@ async fn main() -> anyhow::Result<()> {
                 };
                 println!(
                     "{:<16} {:<9} {:<12} {:<8}{}",
-                    shown, i.status, who,
-                    i.tool.unwrap_or_default(), doing
+                    shown,
+                    i.status,
+                    who,
+                    i.tool.unwrap_or_default(),
+                    doing
                 );
             }
             print_unread_hint().await;
@@ -428,19 +483,26 @@ async fn main() -> anyhow::Result<()> {
         Commands::Events(args) => commands::events::run(args).await?,
         Commands::Threads { cmd } => match cmd {
             None => {
-                let threads: Vec<kore_protocol::api::ThreadSummary> = get_json("/v1/threads").await?;
+                let threads: Vec<kore_protocol::api::ThreadSummary> =
+                    get_json("/v1/threads").await?;
                 if threads.is_empty() {
                     println!("no named threads — send with --thread <name> to start one");
                 }
                 for t in threads {
-                    println!("{:<28} {:>4} msgs  (last #{})", t.name, t.message_count, t.last_msg_id);
+                    println!(
+                        "{:<28} {:>4} msgs  (last #{})",
+                        t.name, t.message_count, t.last_msg_id
+                    );
                 }
             }
             Some(ThreadsCmd::Rename { from, to }) => {
                 let resp = config::http_client()
                     .post(format!("{}/v1/threads/rename", config::server_url()))
                     .bearer_auth(config::load_token()?)
-                    .json(&kore_protocol::api::RenameThreadRequest { from: from.clone(), to: to.clone() })
+                    .json(&kore_protocol::api::RenameThreadRequest {
+                        from: from.clone(),
+                        to: to.clone(),
+                    })
                     .send()
                     .await?;
                 if !resp.status().is_success() {
@@ -458,14 +520,21 @@ async fn main() -> anyhow::Result<()> {
                 .send()
                 .await?;
             if !resp.status().is_success() {
-                anyhow::bail!("unregister failed ({}): {}", resp.status(), resp.text().await?);
+                anyhow::bail!(
+                    "unregister failed ({}): {}",
+                    resp.status(),
+                    resp.text().await?
+                );
             }
             println!("unregistered '{name}'");
         }
         Commands::Kill { name, go } => {
             gate_destructive("kill", &name, go)?;
             let resp = config::http_client()
-                .delete(format!("{}/v1/instances/{name}?kill=true", config::server_url()))
+                .delete(format!(
+                    "{}/v1/instances/{name}?kill=true",
+                    config::server_url()
+                ))
                 .bearer_auth(config::load_token()?)
                 .send()
                 .await?;
@@ -473,8 +542,12 @@ async fn main() -> anyhow::Result<()> {
                 anyhow::bail!("kill failed ({}): {}", resp.status(), resp.text().await?);
             }
             match commands::launch::kill_local(&name) {
-                Some(pid) => println!("killed '{name}' (signalled pid {pid}; name stays dead until relaunch)"),
-                None => println!("killed '{name}' (no local process found; name stays dead until relaunch)"),
+                Some(pid) => println!(
+                    "killed '{name}' (signalled pid {pid}; name stays dead until relaunch)"
+                ),
+                None => println!(
+                    "killed '{name}' (no local process found; name stays dead until relaunch)"
+                ),
             }
         }
         Commands::Update => commands::update::run().await?,
@@ -483,13 +556,18 @@ async fn main() -> anyhow::Result<()> {
             let resp = config::http_client()
                 .patch(format!("{}/v1/instances/self", config::server_url()))
                 .bearer_auth(config::load_token()?)
-                .json(&kore_protocol::api::SetStatusRequest { status_context: text.clone() })
+                .json(&kore_protocol::api::SetStatusRequest {
+                    status_context: text.clone(),
+                })
                 .send()
                 .await?;
             if !resp.status().is_success() {
                 anyhow::bail!("status failed ({}): {}", resp.status(), resp.text().await?);
             }
-            println!("status: {}", if text.is_empty() { "(cleared)" } else { &text });
+            println!(
+                "status: {}",
+                if text.is_empty() { "(cleared)" } else { &text }
+            );
         }
         Commands::AgentKey { name, tag } => {
             // No name → auto CVCV like `launch` (fresh per call: time+pid seed).
@@ -498,11 +576,19 @@ async fn main() -> anyhow::Result<()> {
             let resp = config::http_client()
                 .post(format!("{url}/v1/instances/agents/keys"))
                 .bearer_auth(config::load_token()?)
-                .json(&kore_protocol::api::CreateAgentKeyRequest { name, project: None, tag })
+                .json(&kore_protocol::api::CreateAgentKeyRequest {
+                    name,
+                    project: None,
+                    tag,
+                })
                 .send()
                 .await?;
             if !resp.status().is_success() {
-                anyhow::bail!("agent-key failed ({}): {}", resp.status(), resp.text().await?);
+                anyhow::bail!(
+                    "agent-key failed ({}): {}",
+                    resp.status(),
+                    resp.text().await?
+                );
             }
             let body: kore_protocol::api::CreateAgentKeyResponse = resp.json().await?;
             // Paste-ready MCP client config: the standard `mcpServers` block any
@@ -517,7 +603,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             });
-            println!("minted MCP credential for agent '{}' — shown ONCE, store it now.\n", body.name);
+            println!(
+                "minted MCP credential for agent '{}' — shown ONCE, store it now.\n",
+                body.name
+            );
             println!("Paste this into your MCP client config (Claude Desktop, Cursor, …):\n");
             println!("{}\n", serde_json::to_string_pretty(&cfg)?);
             println!("Or set the env directly and run `kore-client mcp`:");
@@ -528,24 +617,38 @@ async fn main() -> anyhow::Result<()> {
         Commands::Hook(HookCommands::Claude) => hook::run_stdin_dispatch("claude").await?,
         Commands::Hook(HookCommands::Codex) => hook::run_stdin_dispatch("codex").await?,
         Commands::Hook(HookCommands::Centaury) => hook::run_stdin_dispatch("centaury").await?,
-        Commands::Hook(HookCommands::Gemini { event }) => hook::run_argv_hook("gemini", &event).await?,
-        Commands::Hook(HookCommands::Antigravity { event }) => hook::run_argv_hook("antigravity", &event).await?,
+        Commands::Hook(HookCommands::Gemini { event }) => {
+            hook::run_argv_hook("gemini", &event).await?
+        }
+        Commands::Hook(HookCommands::Antigravity { event }) => {
+            hook::run_argv_hook("antigravity", &event).await?
+        }
         Commands::Hook(HookCommands::Cursor { event }) => hook::run_cursor_hook(&event).await?,
         Commands::Hook(HookCommands::Copilot { event }) => hook::run_copilot_hook(&event).await?,
         Commands::Hook(HookCommands::Kimi { event }) => hook::run_kimi_hook(&event).await?,
         Commands::Hook(HookCommands::Hermes) => hook::run_hermes_hook().await?,
         Commands::Hook(HookCommands::Pi { event }) => hook::run_plugin_tool("pi", &event).await?,
         Commands::Hook(HookCommands::Omp { event }) => hook::run_plugin_tool("omp", &event).await?,
-        Commands::Hook(HookCommands::Opencode { event }) => hook::run_plugin_tool("opencode", &event).await?,
-        Commands::Hook(HookCommands::Kilo { event }) => hook::run_plugin_tool("kilo", &event).await?,
-        Commands::Hook(HookCommands::Cline { event }) => hook::run_plugin_tool("cline", &event).await?,
-        Commands::Hook(HookCommands::Openclaw { event }) => hook::run_plugin_tool("openclaw", &event).await?,
+        Commands::Hook(HookCommands::Opencode { event }) => {
+            hook::run_plugin_tool("opencode", &event).await?
+        }
+        Commands::Hook(HookCommands::Kilo { event }) => {
+            hook::run_plugin_tool("kilo", &event).await?
+        }
+        Commands::Hook(HookCommands::Cline { event }) => {
+            hook::run_plugin_tool("cline", &event).await?
+        }
+        Commands::Hook(HookCommands::Openclaw { event }) => {
+            hook::run_plugin_tool("openclaw", &event).await?
+        }
         Commands::Hook(HookCommands::Install { user, tool }) => hook::install(&tool, user)?,
         Commands::Hook(HookCommands::Status { user }) => hook::status(user)?,
         Commands::Hook(HookCommands::Uninstall { tool, user }) => hook::uninstall(&tool, user)?,
-        Commands::Waker { name, tool_pid, tool } => {
-            commands::waker::run(name, tool_pid, tool).await?
-        }
+        Commands::Waker {
+            name,
+            tool_pid,
+            tool,
+        } => commands::waker::run(name, tool_pid, tool).await?,
     }
 
     Ok(())

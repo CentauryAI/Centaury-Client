@@ -55,7 +55,9 @@ pub fn derived_name() -> String {
     let mut h = DefaultHasher::new();
     std::env::var("HOSTNAME").unwrap_or_default().hash(&mut h);
     std::env::current_dir().unwrap_or_default().hash(&mut h);
-    std::env::var("KORE_PROJECT").unwrap_or_default().hash(&mut h);
+    std::env::var("KORE_PROJECT")
+        .unwrap_or_default()
+        .hash(&mut h);
     cvcv_fresh(h.finish())
 }
 
@@ -139,8 +141,9 @@ pub fn server_url() -> String {
 
 /// Shared org secret required by the server to register an instance.
 pub fn reg_secret() -> anyhow::Result<String> {
-    std::env::var("KORE_REG_SECRET")
-        .map_err(|_| anyhow::anyhow!("KORE_REG_SECRET must be set to register (ask your org admin)"))
+    std::env::var("KORE_REG_SECRET").map_err(|_| {
+        anyhow::anyhow!("KORE_REG_SECRET must be set to register (ask your org admin)")
+    })
 }
 
 /// HTTP client with a timeout so a stalled server fails fast instead of

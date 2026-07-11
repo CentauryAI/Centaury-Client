@@ -31,7 +31,12 @@ pub async fn signup(email: String, display_name: String, business: bool) -> anyh
     let password = prompt_password(true)?;
     let resp = config::http_client()
         .post(format!("{}/v1/auth/signup", config::server_url()))
-        .json(&kore_protocol::api::SignupRequest { email, password, display_name, business })
+        .json(&kore_protocol::api::SignupRequest {
+            email,
+            password,
+            display_name,
+            business,
+        })
         .send()
         .await?;
     if !resp.status().is_success() {
@@ -44,7 +49,10 @@ pub async fn signup(email: String, display_name: String, business: bool) -> anyh
             config::save_session(t)?;
             println!("signed up — org '{}', logged in", body.org_name);
         }
-        None => println!("signed up — org '{}'; verify your email, then log in", body.org_name),
+        None => println!(
+            "signed up — org '{}'; verify your email, then log in",
+            body.org_name
+        ),
     }
     if let Some(t) = &body.dev_token {
         println!("dev verify token (mailer unconfigured): {t}");
@@ -69,7 +77,10 @@ pub async fn login(email: String) -> anyhow::Result<()> {
     }
     let body: kore_protocol::api::LoginResponse = resp.json().await?;
     config::save_session(&body.session_token)?;
-    println!("logged in as {} (org '{}')", body.display_name, body.org_name);
+    println!(
+        "logged in as {} (org '{}')",
+        body.display_name, body.org_name
+    );
     Ok(())
 }
 
@@ -81,17 +92,25 @@ pub async fn human(project: Option<String>) -> anyhow::Result<()> {
     let resp = config::http_client()
         .post(format!("{}/v1/auth/register-human", config::server_url()))
         .bearer_auth(session)
-        .json(&kore_protocol::api::RegisterHumanRequest { project: project.clone() })
+        .json(&kore_protocol::api::RegisterHumanRequest {
+            project: project.clone(),
+        })
         .send()
         .await?;
     if !resp.status().is_success() {
-        anyhow::bail!("register-human failed ({}): {}", resp.status(), resp.text().await?);
+        anyhow::bail!(
+            "register-human failed ({}): {}",
+            resp.status(),
+            resp.text().await?
+        );
     }
     let body: kore_protocol::api::RegisterResponse = resp.json().await?;
     config::save_token(&body.token, project.as_deref())?;
     let name = &body.name;
     match &project {
-        Some(p) => println!("you are '{name}' in project '{p}' — export KORE_PROJECT={p} to use this identity"),
+        Some(p) => println!(
+            "you are '{name}' in project '{p}' — export KORE_PROJECT={p} to use this identity"
+        ),
         None => println!("you are '{name}'"),
     }
     Ok(())
