@@ -1,0 +1,122 @@
+# Release pipeline: push a tag `vX.Y.Z` →
+#   1. Build centaury (kore-client binary) for every supported target
+#      (linux musl static, macOS arm64/x86_64, windows x86_64)
+#   2. Create a GitHub Release with the compiled binaries
+#
+# `workflow_dispatch` = dry-run build: compiles all targets, skips the
+# release step — use it to verify the matrix before tagging.
+#
+# One-time manual setup:
+#   - Ensure the repo has the RELEASE_TOKEN secret if you want to publish
+#     releases programmatically (or use the default GITHUB_TOKEN).
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            asset: centaury-x86_64-linux
+            bin: kore-client
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset: centaury-aarch64-macos
+            bin: kore-client
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset: centaury-x86_64-macos
+            bin: kore-client
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: centaury-x86_64-windows.exe
+            bin: kore-client.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == *musl* ]]; then
+            sudo apt-get update && sudo apt-get install -y musl-tools
+          fi
+          rustup update stable && rustup default stable
+          rustup target add "${{ matrix.target }}"
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Build
+        shell: bash
+        run: |
+          cargo build --release -p kore-client --target "${{ matrix.target }}"
+          BIN="target/${{ matrix.target }}/release/${{ matrix.bin }}"
+          cp "$BIN" "${{ matrix.asset }}"
+          # strip on non-windows
+          if [[ "${{ matrix.target }}" != *windows* ]]; then
+            strip "${{ matrix.asset }}"
+          fi
+          # zero-dep guard: linux musl binary must be statically linked
+          if [[ "${{ matrix.target }}" == *musl* ]]; then
+            file "${{ matrix.asset }}" | grep -Eq 'statically linked|static-pie'
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    name: Publish Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches client/Cargo.toml version
+        run: |
+          V=$(grep -m1 '^version' client/Cargo.toml | cut -d'"' -f2)
+          [ "v$V" = "${GITHUB_REF_NAME}" ] || {
+            echo "tag ${GITHUB_REF_NAME} != client/Cargo.toml v$V — bump the crate first"
+            exit 1
+          }
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${{ github.repository }}" \
+            --title "Centaury ${GITHUB_REF_NAME}" \
+            --notes "Install (linux/macOS):
+          \`\`\`
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | sh
+          \`\`\`
+
+          Install (windows):
+          \`\`\`
+          powershell -c \"irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex\"
+          \`\`\`
+
+          Already installed? \`centaury update\`" \
+            dist/*
