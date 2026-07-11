@@ -1,0 +1,28 @@
+[package]
+name = "kore-client"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "kore thin client — connect AI agents to kore cloud"
+
+[dependencies]
+kore-protocol = { git = "https://github.com/CentauryAI/Centaury-Protocol.git", tag = "v0.1.0" }
+clap = { version = "4", features = ["derive"] }
+serde = "1"
+serde_json = "1"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+# rustls, not native-tls: the release binary is static musl with zero system
+# deps (P5) — openssl linkage would break that.
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+dirs = "6.0.0"
+# kimi hooks live in a user TOML (~/.kimi-code/config.toml) — edit it
+# non-destructively, hand-rolled TOML editing corrupts user config (HC10)
+toml_edit = "0.22"
+futures-util = "0.3"
+base64 = "0.22"
+rpassword = "7"
+ratatui = "0.29"
+crossterm = "0.28"
+rmcp = { version = "2.1.0", features = ["transport-io", "schemars"] }

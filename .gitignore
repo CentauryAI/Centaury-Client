@@ -1,0 +1,20 @@
+# Rust
+target/
+*.rs.bk
+Cargo.lock
+
+# Desktop
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/binaries/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+client/src/plugins/node_modules/

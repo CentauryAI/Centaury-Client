@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Centaury brand — white ground · single slate-blue accent (#777fa8) · no
+   multi-color gradients. Ported from web/src/app/globals.css. Slate-blue lives
+   on primary/ring/charts; accent stays a subtle hover surface (shadcn semantics
+   the app already relies on). */
+:root {
+  --radius: 0.625rem;
+  --ground: #e7eaf2;
+  --background: #ffffff;
+  --foreground: #2c2e3a;
+  --card: #ffffff;
+  --card-foreground: #2c2e3a;
+  --popover: #ffffff;
+  --popover-foreground: #2c2e3a;
+  --primary: #777fa8;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f6;
+  --secondary-foreground: #2c2e3a;
+  --muted: #f6f7fa;
+  --muted-foreground: #7c85a6;
+  --accent: #eef1f6;
+  --accent-foreground: #2c2e3a;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e6e9f1;
+  --input: #e6e9f1;
+  --ring: #777fa8;
+  --chart-1: #777fa8;
+  --chart-2: #abb6ce;
+  --chart-3: #595e7a;
+  --chart-4: #dae1eb;
+  --chart-5: #959fbf;
+}
+
+/* Dark kept brand-consistent (slate-blue primary, not the web file's green
+   placeholder which was "prepared, not active"). */
+.dark {
+  --ground: #0c0c14;
+  --background: #10101a;
+  --foreground: #e8eaf0;
+  --card: #181822;
+  --card-foreground: #e8eaf0;
+  --popover: #181822;
+  --popover-foreground: #e8eaf0;
+  --primary: #959fbf;
+  --primary-foreground: #10101a;
+  --secondary: #23242e;
+  --secondary-foreground: #e8eaf0;
+  --muted: #23242e;
+  --muted-foreground: #8a90a6;
+  --accent: #23242e;
+  --accent-foreground: #e8eaf0;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #2a2b36;
+  --input: #2a2b36;
+  --ring: #959fbf;
+  --chart-1: #959fbf;
+  --chart-2: #777fa8;
+  --chart-3: #abb6ce;
+  --chart-4: #595e7a;
+  --chart-5: #dae1eb;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-ground: var(--ground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  /* smooth theme flip: ease the color swap instead of a hard cut/flash.
+     scoped to color props so no layout cost; hover utilities (transition-colors,
+     higher layer) still win their own timing. */
+  @media (prefers-reduced-motion: no-preference) {
+    *,
+    ::before,
+    ::after {
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, fill 0.2s ease;
+    }
+  }
+}
+
+/* Centaury /client visual kit — recurring patterns from web/src/app/client:
+   slate wells, white cards, pill buttons, icon buttons. Shared so panels can't
+   drift apart. Theme-aware via tokens (foreground CTA inverts in dark). */
+@layer components {
+  .k-card {
+    @apply rounded-2xl border border-border bg-card;
+  }
+  .k-well {
+    @apply rounded-2xl bg-muted;
+  }
+  .k-pill-solid {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50;
+  }
+  .k-pill-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-sm font-medium text-foreground/75 transition-colors hover:bg-muted;
+  }
+  .k-iconbtn {
+    @apply flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground/70 transition-colors hover:bg-muted hover:text-foreground;
+  }
+  /* stands in for the web's font-heading until a display face is bundled */
+  .k-title {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* custom titlebar buttons (frameless window) — from desktop-legacy */
+  .title-bar-btn {
+    @apply flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground;
+  }
+  .title-bar-control {
+    @apply flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground;
+  }
+}
