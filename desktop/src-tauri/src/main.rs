@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    kore_desktop_lib::run()
+    centaury_desktop_lib::run()
 }
