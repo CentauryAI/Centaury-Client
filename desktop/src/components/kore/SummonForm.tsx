@@ -4,7 +4,7 @@
 // DU-S1's fence); owner defaults to YOU with a searchable picker over the org
 // directory (DU-S4) to DELEGATE the agent to another account (Q1 — the server
 // validates the delegate is a real account). Spawning shells to
-// `kore-client launch` through the Tauri `spawn_launch` (DU-D1 — reuse the CLI).
+// `centaury launch` through the Tauri `spawn_launch` (DU-D1 — reuse the CLI).
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, store, type OrgMemberSummary, type ProjectSummary } from "@/lib/api";
@@ -75,7 +75,7 @@ export function SummonForm({ project, open, onClose, onLaunched }: {
   async function launch(e: React.FormEvent) {
     e.preventDefault();
     if (store.demo) {
-      toast.info("Demo mode — launching needs a real server + kore-client.");
+      toast.info("Demo mode — launching needs a real server + centaury.");
       return;
     }
     setBusy(true);
@@ -98,7 +98,7 @@ export function SummonForm({ project, open, onClose, onLaunched }: {
       onLaunched();
       onClose();
     } catch (err) {
-      toast.error(String(err)); // kore-client's error verbatim (plan rule)
+      toast.error(String(err)); // centaury's error verbatim (plan rule)
     } finally {
       setBusy(false);
     }
@@ -112,7 +112,7 @@ export function SummonForm({ project, open, onClose, onLaunched }: {
             <Rocket className="h-4 w-4" /> Summon agents
           </DialogTitle>
           <DialogDescription>
-            Launches via kore-client on this machine. The agent's owner is you (your account).
+            Launches via centaury on this machine. The agent's owner is you (your account).
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={launch} className="space-y-3">

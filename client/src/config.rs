@@ -202,7 +202,7 @@ pub fn instance_name() -> anyhow::Result<String> {
 
 pub fn load_token() -> anyhow::Result<String> {
     Ok(std::fs::read_to_string(token_path())
-        .map_err(|_| anyhow::anyhow!("not registered — run `kore-client register <name>` first"))?
+        .map_err(|_| anyhow::anyhow!("not registered — run `centaury register <name>` first"))?
         .trim()
         .to_string())
 }
@@ -223,7 +223,7 @@ pub fn save_session(token: &str) -> anyhow::Result<()> {
 
 pub fn load_session() -> anyhow::Result<String> {
     Ok(std::fs::read_to_string(session_path())
-        .map_err(|_| anyhow::anyhow!("not logged in — run `kore-client login` first"))?
+        .map_err(|_| anyhow::anyhow!("not logged in — run `centaury login` first"))?
         .trim()
         .to_string())
 }

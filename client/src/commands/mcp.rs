@@ -1,4 +1,4 @@
-//! Layer B — the MCP transport. `kore-client mcp` runs a stdio MCP server that
+//! Layer B — the MCP transport. `centaury mcp` runs a stdio MCP server that
 //! wraps the existing HTTP+WS client (config.rs / ws.rs) and exposes kore as MCP
 //! tools. It is an ALTERNATIVE transport, not a replacement: same server, same
 //! HTTP+WS wire, same message path. For agent tools that can't run kore's hooks
@@ -318,7 +318,7 @@ impl ServerHandler for Kore {
 
 /// B4: a key alone (+ server URL) boots a working agent. If `KORE_AGENT_KEY` is
 /// set, enroll it for a fresh instance token before serving; otherwise fall back
-/// to an already-stored token (e.g. a human running `kore-client mcp` directly).
+/// to an already-stored token (e.g. a human running `centaury mcp` directly).
 async fn ensure_token() -> anyhow::Result<()> {
     match std::env::var("KORE_AGENT_KEY") {
         Ok(key) if !key.is_empty() => {
@@ -340,7 +340,7 @@ async fn ensure_token() -> anyhow::Result<()> {
         _ => config::load_token().map(|_| ()).map_err(|_| {
             anyhow::anyhow!(
                 "no KORE_AGENT_KEY set and no stored token — mint one with \
-                 `kore-client agent-key <name>` (or set KORE_AGENT_KEY to an existing key)"
+                 `centaury agent-key <name>` (or set KORE_AGENT_KEY to an existing key)"
             )
         }),
     }

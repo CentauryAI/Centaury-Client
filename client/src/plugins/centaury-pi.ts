@@ -4,11 +4,11 @@
 // reconcile timers — the extension only bridges three moments, exactly like
 // the kore opencode plugin:
 //
-//   before_agent_start -> `kore-client hook pi session-start` (register,
+//   before_agent_start -> `centaury hook pi session-start` (register,
 //                         bootstrap injected once as a hidden message)
-//   tool_result        -> `kore-client hook pi drain` (mid-turn messages ride
+//   tool_result        -> `centaury hook pi drain` (mid-turn messages ride
 //                         in as a follow-up, claude-parity)
-//   agent_end (idle)   -> `kore-client hook pi wait` (blocks server-side up
+//   agent_end (idle)   -> `centaury hook pi wait` (blocks server-side up
 //                         to KORE_HOOK_TIMEOUT; messages re-enter via
 //                         sendUserMessage)
 //
@@ -29,7 +29,7 @@ export default function koreExtension(pi: ExtensionAPI) {
 
   async function kore(event: string): Promise<string> {
     try {
-      const child = require("node:child_process").spawn("kore-client", ["hook", TOOL, event])
+      const child = require("node:child_process").spawn("centaury", ["hook", TOOL, event])
       let out = ""
       child.stdout.on("data", (c: Buffer) => (out += c.toString()))
       return await new Promise<string>((resolve) => {
@@ -37,7 +37,7 @@ export default function koreExtension(pi: ExtensionAPI) {
         child.on("close", (code: number) => resolve(code === 0 ? out : ""))
       })
     } catch {
-      return "" // kore-client missing/unreachable: never break the host tool
+      return "" // centaury missing/unreachable: never break the host tool
     }
   }
 
@@ -85,7 +85,7 @@ export default function koreExtension(pi: ExtensionAPI) {
     waiting = true
     try {
       // Re-arm on empty returns (hcom 97c8304 concept, kore-shaped): `wait`
-      // returns "" on KORE_HOOK_TIMEOUT with no traffic AND on kore-client
+      // returns "" on KORE_HOOK_TIMEOUT with no traffic AND on centaury
       // errors — without a loop the agent goes deaf until the next human
       // prompt. Backoff keeps a dead server from becoming a spawn storm.
       // ponytail: loop holds this handler's promise for the session's life;

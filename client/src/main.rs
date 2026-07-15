@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "kore-client",
+    name = "centaury",
     version,
     about = "kore thin client — connect AI agents to kore cloud"
 )]
@@ -125,7 +125,7 @@ enum Commands {
         #[arg(long)]
         go: bool,
     },
-    /// Update kore-client to the latest released version
+    /// Update centaury to the latest released version
     Update,
     /// Set your "what I'm doing" status (shown in list)
     Status {
@@ -134,7 +134,7 @@ enum Commands {
     },
     /// Mint an MCP credential for a NEW agent in your project (you become its
     /// owner). Prints the key ONCE + a ready-to-paste MCP config. For tools that
-    /// can't run kore hooks; the agent connects with `kore-client mcp`.
+    /// can't run kore hooks; the agent connects with `centaury mcp`.
     AgentKey {
         /// Agent name. Omit for an auto-generated CVCV name (like `launch`).
         name: Option<String>,
@@ -302,7 +302,7 @@ async fn print_unread_hint() {
         return;
     };
     if v.count > 0 {
-        println!("[kore] {} unread — kore-client history", v.count);
+        println!("[kore] {} unread — centaury history", v.count);
     }
 }
 
@@ -322,7 +322,7 @@ pub async fn get_json<T: serde::de::DeserializeOwned>(path: &str) -> anyhow::Res
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // bare `kore-client` → TUI, like legacy bare `kore`
+    // bare `centaury` → TUI, like legacy bare `kore`
     match cli.command.unwrap_or(Commands::Tui) {
         Commands::Register {
             name,
@@ -386,7 +386,7 @@ async fn main() -> anyhow::Result<()> {
                 });
                 let Some(i) = hit else {
                     eprintln!(
-                        "no agent '{target}' in your project — `kore-client list` to see the roster"
+                        "no agent '{target}' in your project — `centaury list` to see the roster"
                     );
                     std::process::exit(1);
                 };
@@ -597,7 +597,7 @@ async fn main() -> anyhow::Result<()> {
             let cfg = serde_json::json!({
                 "mcpServers": {
                     "kore": {
-                        "command": "kore-client",
+                        "command": "centaury",
                         "args": ["mcp"],
                         "env": { "KORE_SERVER_URL": url, "KORE_AGENT_KEY": body.key }
                     }
@@ -609,7 +609,7 @@ async fn main() -> anyhow::Result<()> {
             );
             println!("Paste this into your MCP client config (Claude Desktop, Cursor, …):\n");
             println!("{}\n", serde_json::to_string_pretty(&cfg)?);
-            println!("Or set the env directly and run `kore-client mcp`:");
+            println!("Or set the env directly and run `centaury mcp`:");
             println!("  KORE_SERVER_URL={url}");
             println!("  KORE_AGENT_KEY={}", body.key);
         }

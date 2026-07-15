@@ -29,7 +29,7 @@ pub async fn run(args: ResumeArgs) -> anyhow::Result<()> {
         .find(|i| i.name == args.name)
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "no instance '{}' in your project (see `kore-client list`)",
+                "no instance '{}' in your project (see `centaury list`)",
                 args.name
             )
         })?;

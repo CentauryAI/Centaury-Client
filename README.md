@@ -6,7 +6,7 @@ Thin client layer for the Centaury network — connections + UI only, zero produ
 
 | Crate | Description |
 |---|---|
-| `client/` | CLI/TUI client (`kore-client`) — Rust, MIT |
+| `client/` | CLI/TUI client (`centaury`) — Rust, MIT |
 | `desktop/` | GUI desktop app (Tauri v2 + React 19 + Vite) |
 
 ## Dependencies
@@ -22,7 +22,7 @@ All product logic lives server-side. The client is publishable (MIT) because the
 
 ```bash
 # CLI client
-cargo build -p kore-client
+cargo build -p centaury
 
 # Desktop (frontend)
 cd desktop && pnpm install && pnpm build

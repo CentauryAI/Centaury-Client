@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-/// $KORE_DIR (env) or ~/.kore — mirrors kore-client config.rs.
+/// $KORE_DIR (env) or ~/.kore — mirrors centaury config.rs.
 fn kore_dir() -> Result<PathBuf, String> {
     if let Ok(d) = std::env::var("KORE_DIR") {
         return Ok(PathBuf::from(d));
@@ -24,7 +24,7 @@ struct ToolHit {
     found: bool,
 }
 
-/// Which of the 12 supported tool CLIs are installed. Mirrors kore-client's
+/// Which of the 12 supported tool CLIs are installed. Mirrors centaury's
 /// SUPPORTED_TOOLS + tool_binary (cursor's binary is cursor-agent).
 #[tauri::command]
 fn detect_tools() -> Vec<ToolHit> {
@@ -52,7 +52,7 @@ fn detect_tools() -> Vec<ToolHit> {
 }
 
 /// Materialize the app's instance token at $KORE_DIR/<project>/token — the
-/// exact file `kore-client human` writes, so the CLI acts as the logged-in
+/// exact file `centaury human` writes, so the CLI acts as the logged-in
 /// human (one shared identity, see spawn_launch).
 fn write_project_token(project: &str, token: &str) -> Result<(), String> {
     let proj_dir = kore_dir()?.join(project);
@@ -60,23 +60,23 @@ fn write_project_token(project: &str, token: &str) -> Result<(), String> {
     std::fs::write(proj_dir.join("token"), token).map_err(|e| e.to_string())
 }
 
-/// kore-client binary: bundled sidecar first (tauri externalBin lands it next
+/// centaury binary: bundled sidecar first (tauri externalBin lands it next
 /// to the app exe — app-only users never install the CLI, C1), PATH fallback
 /// for dev shells.
 fn kore_bin() -> std::path::PathBuf {
     if let Ok(exe) = std::env::current_exe() {
-        let sib = exe.with_file_name("kore-client");
+        let sib = exe.with_file_name("centaury");
         if sib.exists() {
             return sib;
         }
     }
-    "kore-client".into()
+    "centaury".into()
 }
 
 fn run_kore(cmd: &mut Command) -> Result<String, String> {
     let out = cmd
         .output()
-        .map_err(|e| format!("kore-client not found on PATH? {e}"))?;
+        .map_err(|e| format!("centaury not found on PATH? {e}"))?;
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -86,14 +86,14 @@ fn run_kore(cmd: &mut Command) -> Result<String, String> {
         Ok(text)
     } else {
         Err(if text.trim().is_empty() {
-            format!("kore-client failed ({})", out.status)
+            format!("centaury failed ({})", out.status)
         } else {
             text
         })
     }
 }
 
-/// Kill an agent (DU-D6): shells to `kore-client kill <name>` — server row
+/// Kill an agent (DU-D6): shells to `centaury kill <name>` — server row
 /// delete + WS kick + name tombstone + SIGTERM of the locally recorded pid
 /// (launch wrote agents/<name>.pid). Reuse over reimplementing the pid-file
 /// dance. No --go needed: the app shell has no KORE_NAME (D10 gates agents,
@@ -130,10 +130,10 @@ struct LaunchOpts {
     args: Vec<String>,
 }
 
-/// Summon agents by shelling to `kore-client launch` (DU-D1: reuse the CLI's
+/// Summon agents by shelling to `centaury launch` (DU-D1: reuse the CLI's
 /// launcher + 12-dialect hook installer, never reimplement them here). The
 /// app's instance token is materialized at $KORE_DIR/<project>/token — the
-/// exact file `kore-client human` writes — so launch authenticates as the
+/// exact file `centaury human` writes — so launch authenticates as the
 /// logged-in human and the CLI and app share one identity.
 #[tauri::command]
 fn spawn_launch(opts: LaunchOpts) -> Result<String, String> {

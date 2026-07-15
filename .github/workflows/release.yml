@@ -1,5 +1,5 @@
 # Release pipeline: push a tag `vX.Y.Z` →
-#   1. Build centaury (kore-client binary) for every supported target
+#   1. Build centaury (centaury binary) for every supported target
 #      (linux musl static, macOS arm64/x86_64, windows x86_64)
 #   2. Create a GitHub Release with the compiled binaries
 #
@@ -29,19 +29,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             asset: centaury-x86_64-linux
-            bin: kore-client
+            bin: centaury
           - os: macos-latest
             target: aarch64-apple-darwin
             asset: centaury-aarch64-macos
-            bin: kore-client
+            bin: centaury
           - os: macos-latest
             target: x86_64-apple-darwin
             asset: centaury-x86_64-macos
-            bin: kore-client
+            bin: centaury
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             asset: centaury-x86_64-windows.exe
-            bin: kore-client.exe
+            bin: centaury.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          cargo build --release -p kore-client --target "${{ matrix.target }}"
+          cargo build --release -p centaury --target "${{ matrix.target }}"
           BIN="target/${{ matrix.target }}/release/${{ matrix.bin }}"
           cp "$BIN" "${{ matrix.asset }}"
           # strip on non-windows

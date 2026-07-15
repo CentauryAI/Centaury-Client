@@ -209,8 +209,8 @@ mod tests {
     fn cmdline_guard_matches_own_process() {
         let me = std::process::id();
         assert!(
-            cmdline_contains(me, "kore"),
-            "test binary path contains 'kore'"
+            cmdline_contains(me, "centaury"),
+            "test binary path contains 'centaury'"
         );
         assert!(!cmdline_contains(me, "definitely-not-in-any-cmdline"));
         assert!(

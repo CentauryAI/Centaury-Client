@@ -105,7 +105,7 @@ pub async fn run(args: EventsArgs) -> anyhow::Result<()> {
         Some(EventsSubcmd::Subs) => {
             let subs: Vec<EventSubInfo> = crate::get_json("/v1/events/subs").await?;
             if subs.is_empty() {
-                println!("no subscriptions — `kore-client events sub --type life` to add one");
+                println!("no subscriptions — `centaury events sub --type life` to add one");
             }
             for s in subs {
                 let any = || "*".to_string();

@@ -1,7 +1,7 @@
 [package]
 name = "centaury-desktop"
 version = "0.1.0"
-description = "Kore desktop app — GUI kore-client"
+description = "Kore desktop app — GUI centaury"
 authors = ["Kore"]
 edition = "2021"
 

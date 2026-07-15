@@ -134,7 +134,7 @@ export function AgentDetail({
           </div>
         )}
 
-        {/* kill (DU-D6): kore-client kill = server delete + tombstone + local
+        {/* kill (DU-D6): centaury kill = server delete + tombstone + local
             SIGTERM. Server trusts any org member; confirm() is the client-side
             friction (D10's GUI analogue). Agents only. */}
         {agent.kind === "agent" && (

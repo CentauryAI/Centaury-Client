@@ -157,7 +157,7 @@ async fn create(
     }
     let body: CreateBundleResponse = resp.json().await?;
     println!(
-        "{}  — share it: kore-client send @who --bundle {} -- context ready",
+        "{}  — share it: centaury send @who --bundle {} -- context ready",
         body.id, body.id
     );
     Ok(())
