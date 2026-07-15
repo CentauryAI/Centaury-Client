@@ -85,7 +85,7 @@ fn files_newest_first(roots: impl IntoIterator<Item = PathBuf>, exts: &[&str]) -
             }
         }
     }
-    files.sort_by(|a, b| b.0.cmp(&a.0));
+    files.sort_by_key(|f| std::cmp::Reverse(f.0));
     files.into_iter().map(|(_, p)| p).collect()
 }
 
@@ -460,10 +460,10 @@ fn codex_text(payload: &Value) -> String {
 /// resume keeps bailing for it (HC13-resume gate; its verb also differs:
 /// upstream pi takes `--session`, omp renamed it `--resume`).
 fn omp_sessions_root() -> PathBuf {
-    if let Ok(d) = std::env::var("PI_CODING_AGENT_DIR") {
-        if !d.is_empty() {
-            return PathBuf::from(d).join("sessions");
-        }
+    if let Ok(d) = std::env::var("PI_CODING_AGENT_DIR")
+        && !d.is_empty()
+    {
+        return PathBuf::from(d).join("sessions");
     }
     dirs::home_dir()
         .unwrap_or_default()

@@ -414,15 +414,15 @@ async fn main() -> anyhow::Result<()> {
                     }
                 );
                 println!("  kind:      {who}");
-                if let Some(t) = &i.tool {
-                    if !t.is_empty() {
-                        println!("  tool:      {t}");
-                    }
+                if let Some(t) = &i.tool
+                    && !t.is_empty()
+                {
+                    println!("  tool:      {t}");
                 }
-                if let Some(d) = &i.directory {
-                    if !d.is_empty() {
-                        println!("  directory: {d}");
-                    }
+                if let Some(d) = &i.directory
+                    && !d.is_empty()
+                {
+                    println!("  directory: {d}");
                 }
                 return Ok(());
             }

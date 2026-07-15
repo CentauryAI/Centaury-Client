@@ -154,12 +154,12 @@ pub async fn run(name: String, tool_pid: u32, tool: String) -> anyhow::Result<()
 
     // One waker per instance: a pid file whose process still IS a waker wins.
     let pid_path = config::agent_waker_pid_path(&name, project.as_deref());
-    if let Ok(existing) = std::fs::read_to_string(&pid_path) {
-        if let Ok(pid) = existing.trim().parse::<u32>() {
-            if pid != std::process::id() && cmdline_contains(pid, "waker") {
-                return Ok(());
-            }
-        }
+    if let Ok(existing) = std::fs::read_to_string(&pid_path)
+        && let Ok(pid) = existing.trim().parse::<u32>()
+        && pid != std::process::id()
+        && cmdline_contains(pid, "waker")
+    {
+        return Ok(());
     }
     if let Some(parent) = pid_path.parent() {
         std::fs::create_dir_all(parent)?;

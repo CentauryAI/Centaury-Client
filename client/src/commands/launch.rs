@@ -245,10 +245,10 @@ pub async fn run(mut args: LaunchArgs) -> anyhow::Result<()> {
     if args.tag.is_none() {
         args.tag = std::env::var("KORE_TAG").ok().filter(|t| !t.is_empty());
     }
-    if let Some(tag) = &args.tag {
-        if tag.is_empty() || !tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
-            anyhow::bail!("tag can only contain letters, numbers, and hyphens");
-        }
+    if let Some(tag) = &args.tag
+        && (tag.is_empty() || !tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'))
+    {
+        anyhow::bail!("tag can only contain letters, numbers, and hyphens");
     }
     // Every agent has an owner = whoever launches it (server derives the same
     // from the launcher's token; this covers the hook self-register fallback,

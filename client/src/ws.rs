@@ -55,7 +55,7 @@ pub async fn next_delivery(ws: &mut WsStream) -> anyhow::Result<Option<Delivery>
 pub async fn send_ack(ws: &mut WsStream, id: i64) -> anyhow::Result<()> {
     use tokio_tungstenite::tungstenite::Message as Frame;
     let frame = serde_json::to_string(&kore_protocol::api::AckFrame { ack: id })?;
-    ws.send(Frame::Text(frame.into())).await?;
+    ws.send(Frame::Text(frame)).await?;
     Ok(())
 }
 

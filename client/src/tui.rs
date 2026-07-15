@@ -739,10 +739,10 @@ fn handle_key(
     cmd_tx: &tokio_mpsc::UnboundedSender<Cmd>,
 ) -> bool {
     // Ctrl-C quits from anywhere.
-    if let KeyCode::Char('c') = code {
-        if mods.contains(KeyModifiers::CONTROL) {
-            return true;
-        }
+    if let KeyCode::Char('c') = code
+        && mods.contains(KeyModifiers::CONTROL)
+    {
+        return true;
     }
     // Overlays swallow everything else while open.
     if !matches!(ui.overlay, Overlay::None) {
@@ -968,18 +968,14 @@ fn handle_input_key(code: KeyCode, ui: &mut Ui, cmd_tx: &tokio_mpsc::UnboundedSe
         KeyCode::PageDown => ui.scroll = ui.scroll.saturating_sub(5),
         KeyCode::End => ui.scroll = 0,
         // Empty line: hand focus to the roster. With text: cycle @mentions.
-        KeyCode::Tab if ui.input.is_empty() => {
-            if !ui.roster.is_empty() {
-                ui.focus = Focus::Roster;
-                ui.cursor = ui.cursor.min(ui.roster.len() - 1);
-            }
+        KeyCode::Tab if ui.input.is_empty() && !ui.roster.is_empty() => {
+            ui.focus = Focus::Roster;
+            ui.cursor = ui.cursor.min(ui.roster.len() - 1);
         }
-        KeyCode::Tab => {
-            if !ui.roster.is_empty() {
-                ui.mention_pick %= ui.roster.len();
-                ui.input = cycle_mention(&ui.input, &ui.roster[ui.mention_pick].name);
-                ui.mention_pick += 1;
-            }
+        KeyCode::Tab if !ui.roster.is_empty() => {
+            ui.mention_pick %= ui.roster.len();
+            ui.input = cycle_mention(&ui.input, &ui.roster[ui.mention_pick].name);
+            ui.mention_pick += 1;
         }
         KeyCode::Enter => {
             let text = ui.input.trim().to_string();
@@ -1200,183 +1196,6 @@ fn cycle_mention(input: &str, name: &str) -> String {
         None => input,
     };
     format!("@{name} {rest}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_ui(roster: Vec<InstanceSummary>) -> Ui {
-        Ui {
-            roster,
-            projects: vec![],
-            feed: vec![],
-            input: String::new(),
-            scroll: 0,
-            thread_filter: None,
-            mention_pick: 0,
-            focus: Focus::Input,
-            cursor: 0,
-            selected: HashSet::new(),
-            overlay: Overlay::None,
-            theme: Theme {
-                pal_i: 0,
-                style_i: 0,
-            },
-            layout_i: 0,
-        }
-    }
-
-    fn agent(name: &str, ctx: &str) -> InstanceSummary {
-        InstanceSummary {
-            name: name.into(),
-            tag: None,
-            status: "active".into(),
-            kind: "agent".into(),
-            owner: None,
-            tool: Some("claude".into()),
-            directory: None,
-            status_context: ctx.into(),
-            last_seen_msg_id: 0,
-        }
-    }
-
-    #[test]
-    fn agent_at_line_accounts_for_status_context_rows() {
-        // luna has a "doing" line (2 rows), nova doesn't (1 row).
-        let ui = test_ui(vec![agent("luna", "building"), agent("nova", "")]);
-        assert_eq!(agent_at_line(&ui, 0), Some(0)); // luna name
-        assert_eq!(agent_at_line(&ui, 1), Some(0)); // luna doing
-        assert_eq!(agent_at_line(&ui, 2), Some(1)); // nova name
-        assert_eq!(agent_at_line(&ui, 3), None); // past the end
-    }
-
-    #[test]
-    fn footer_hits_are_clickable_ordered_and_within_render() {
-        let ui = test_ui(vec![]); // Input focus
-        let (spans, hits) = footer_spans_hits(&ui);
-        let rendered: u16 = spans.iter().map(|s| s.content.chars().count() as u16).sum();
-        assert!(!hits.is_empty());
-        let mut prev_end = 0;
-        for (start, end, _, _) in &hits {
-            assert!(start < end, "empty hit range");
-            assert!(*start >= prev_end, "hit ranges overlap/out of order");
-            assert!(*end <= rendered, "hit range exceeds rendered width");
-            prev_end = *end;
-        }
-    }
-
-    #[test]
-    fn cycle_mention_replaces_leading_target_only() {
-        assert_eq!(cycle_mention("", "luna"), "@luna ");
-        assert_eq!(
-            cycle_mention("fix the build", "luna"),
-            "@luna fix the build"
-        );
-        assert_eq!(
-            cycle_mention("@luna fix the build", "nova"),
-            "@nova fix the build"
-        );
-        assert_eq!(cycle_mention("@luna", "nova"), "@nova ");
-    }
-
-    #[test]
-    fn launch_form_cycles_and_builds_argv() {
-        let mut f = LaunchForm::new(
-            vec!["you (me)".into(), "boss".into()],
-            vec!["(current)".into(), "research".into()],
-        );
-        f.cycle(-1); // tool wraps backwards
-        assert_eq!(TOOLS[f.tool], "cline");
-        f.field = 1;
-        f.cycle(-1); // count clamps at 1
-        assert_eq!(f.count, 1);
-        f.cycle(1);
-        f.cycle(1);
-        assert_eq!(f.count, 3);
-        f.field = 3;
-        f.cycle(1); // headless toggles
-        assert!(f.headless);
-
-        f.tag = "team".into();
-        let argv = f.argv();
-        assert_eq!(
-            argv,
-            [
-                "launch",
-                "--tool",
-                "cline",
-                "--tag",
-                "team",
-                "--count",
-                "3",
-                "--headless"
-            ]
-        );
-        f.headless = false;
-        // default terminal option is "split" — divide the TUI's own terminal
-        assert!(
-            f.argv()
-                .ends_with(&["--terminal".to_string(), "split".to_string()])
-        );
-
-        // Project/Owner are SELECTS: index 0 = defaults (nothing in argv);
-        // cycling to a real entry rides into the argv; free text is impossible.
-        f.field = 5;
-        f.cycle(1);
-        assert!(f.argv().contains(&"research".to_string()));
-        f.field = 6;
-        f.cycle(1);
-        assert!(
-            f.argv()
-                .ends_with(&["--owner".to_string(), "boss".to_string()])
-        );
-        f.cycle(1); // wraps back to "you" → --owner gone (server default = caller)
-        assert!(!f.argv().iter().any(|a| a == "--owner"));
-    }
-
-    #[test]
-    fn themes_have_every_axis() {
-        // Three cycle axes non-empty and the composed theme indexes safely.
-        assert_eq!(PALETTES.len(), 4);
-        assert_eq!(STYLES.len(), 3);
-        assert_eq!(LAYOUTS.len(), 3);
-        let th = Theme {
-            pal_i: PALETTES.len() - 1,
-            style_i: STYLES.len() - 1,
-        };
-        assert_eq!(th.pal().name, "light");
-        assert_eq!(th.gl().name, "ascii");
-        assert_eq!(th.gl().border, BorderKind::Ascii);
-    }
-
-    #[test]
-    fn every_layout_places_two_disjoint_panels() {
-        // Each layout must yield non-empty agents/feed rects that don't overlap,
-        // in both borderless and bordered styles — the mouse relies on it.
-        let area = Rect::new(0, 0, 80, 24);
-        for style_i in 0..STYLES.len() {
-            for layout_i in 0..LAYOUTS.len() {
-                let mut ui = test_ui(vec![]);
-                ui.theme.style_i = style_i;
-                ui.layout_i = layout_i;
-                let (a, fd) = agents_feed_rects(area, &ui);
-                assert!(
-                    a.width > 0 && a.height > 0,
-                    "empty agents {style_i}/{layout_i}"
-                );
-                assert!(
-                    fd.width > 0 && fd.height > 0,
-                    "empty feed {style_i}/{layout_i}"
-                );
-                let disjoint = a.x + a.width <= fd.x
-                    || fd.x + fd.width <= a.x
-                    || a.y + a.height <= fd.y
-                    || fd.y + fd.height <= a.y;
-                assert!(disjoint, "panels overlap at {style_i}/{layout_i}");
-            }
-        }
-    }
 }
 
 // ---- Rendering ----
@@ -1846,4 +1665,181 @@ fn form_lines(form: &LaunchForm, th: &Theme) -> Vec<Line<'static>> {
         line
     }));
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_ui(roster: Vec<InstanceSummary>) -> Ui {
+        Ui {
+            roster,
+            projects: vec![],
+            feed: vec![],
+            input: String::new(),
+            scroll: 0,
+            thread_filter: None,
+            mention_pick: 0,
+            focus: Focus::Input,
+            cursor: 0,
+            selected: HashSet::new(),
+            overlay: Overlay::None,
+            theme: Theme {
+                pal_i: 0,
+                style_i: 0,
+            },
+            layout_i: 0,
+        }
+    }
+
+    fn agent(name: &str, ctx: &str) -> InstanceSummary {
+        InstanceSummary {
+            name: name.into(),
+            tag: None,
+            status: "active".into(),
+            kind: "agent".into(),
+            owner: None,
+            tool: Some("claude".into()),
+            directory: None,
+            status_context: ctx.into(),
+            last_seen_msg_id: 0,
+        }
+    }
+
+    #[test]
+    fn agent_at_line_accounts_for_status_context_rows() {
+        // luna has a "doing" line (2 rows), nova doesn't (1 row).
+        let ui = test_ui(vec![agent("luna", "building"), agent("nova", "")]);
+        assert_eq!(agent_at_line(&ui, 0), Some(0)); // luna name
+        assert_eq!(agent_at_line(&ui, 1), Some(0)); // luna doing
+        assert_eq!(agent_at_line(&ui, 2), Some(1)); // nova name
+        assert_eq!(agent_at_line(&ui, 3), None); // past the end
+    }
+
+    #[test]
+    fn footer_hits_are_clickable_ordered_and_within_render() {
+        let ui = test_ui(vec![]); // Input focus
+        let (spans, hits) = footer_spans_hits(&ui);
+        let rendered: u16 = spans.iter().map(|s| s.content.chars().count() as u16).sum();
+        assert!(!hits.is_empty());
+        let mut prev_end = 0;
+        for (start, end, _, _) in &hits {
+            assert!(start < end, "empty hit range");
+            assert!(*start >= prev_end, "hit ranges overlap/out of order");
+            assert!(*end <= rendered, "hit range exceeds rendered width");
+            prev_end = *end;
+        }
+    }
+
+    #[test]
+    fn cycle_mention_replaces_leading_target_only() {
+        assert_eq!(cycle_mention("", "luna"), "@luna ");
+        assert_eq!(
+            cycle_mention("fix the build", "luna"),
+            "@luna fix the build"
+        );
+        assert_eq!(
+            cycle_mention("@luna fix the build", "nova"),
+            "@nova fix the build"
+        );
+        assert_eq!(cycle_mention("@luna", "nova"), "@nova ");
+    }
+
+    #[test]
+    fn launch_form_cycles_and_builds_argv() {
+        let mut f = LaunchForm::new(
+            vec!["you (me)".into(), "boss".into()],
+            vec!["(current)".into(), "research".into()],
+        );
+        f.cycle(-1); // tool wraps backwards
+        assert_eq!(TOOLS[f.tool], "cline");
+        f.field = 1;
+        f.cycle(-1); // count clamps at 1
+        assert_eq!(f.count, 1);
+        f.cycle(1);
+        f.cycle(1);
+        assert_eq!(f.count, 3);
+        f.field = 3;
+        f.cycle(1); // headless toggles
+        assert!(f.headless);
+
+        f.tag = "team".into();
+        let argv = f.argv();
+        assert_eq!(
+            argv,
+            [
+                "launch",
+                "--tool",
+                "cline",
+                "--tag",
+                "team",
+                "--count",
+                "3",
+                "--headless"
+            ]
+        );
+        f.headless = false;
+        // default terminal option is "split" — divide the TUI's own terminal
+        assert!(
+            f.argv()
+                .ends_with(&["--terminal".to_string(), "split".to_string()])
+        );
+
+        // Project/Owner are SELECTS: index 0 = defaults (nothing in argv);
+        // cycling to a real entry rides into the argv; free text is impossible.
+        f.field = 5;
+        f.cycle(1);
+        assert!(f.argv().contains(&"research".to_string()));
+        f.field = 6;
+        f.cycle(1);
+        assert!(
+            f.argv()
+                .ends_with(&["--owner".to_string(), "boss".to_string()])
+        );
+        f.cycle(1); // wraps back to "you" → --owner gone (server default = caller)
+        assert!(!f.argv().iter().any(|a| a == "--owner"));
+    }
+
+    #[test]
+    fn themes_have_every_axis() {
+        // Three cycle axes non-empty and the composed theme indexes safely.
+        assert_eq!(PALETTES.len(), 4);
+        assert_eq!(STYLES.len(), 3);
+        assert_eq!(LAYOUTS.len(), 3);
+        let th = Theme {
+            pal_i: PALETTES.len() - 1,
+            style_i: STYLES.len() - 1,
+        };
+        assert_eq!(th.pal().name, "light");
+        assert_eq!(th.gl().name, "ascii");
+        assert_eq!(th.gl().border, BorderKind::Ascii);
+    }
+
+    #[test]
+    fn every_layout_places_two_disjoint_panels() {
+        // Each layout must yield non-empty agents/feed rects that don't overlap,
+        // in both borderless and bordered styles — the mouse relies on it.
+        let area = Rect::new(0, 0, 80, 24);
+        for style_i in 0..STYLES.len() {
+            for layout_i in 0..LAYOUTS.len() {
+                let mut ui = test_ui(vec![]);
+                ui.theme.style_i = style_i;
+                ui.layout_i = layout_i;
+                let (a, fd) = agents_feed_rects(area, &ui);
+                assert!(
+                    a.width > 0 && a.height > 0,
+                    "empty agents {style_i}/{layout_i}"
+                );
+                assert!(
+                    fd.width > 0 && fd.height > 0,
+                    "empty feed {style_i}/{layout_i}"
+                );
+                let disjoint = a.x + a.width <= fd.x
+                    || fd.x + fd.width <= a.x
+                    || a.y + a.height <= fd.y
+                    || fd.y + fd.height <= a.y;
+                assert!(disjoint, "panels overlap at {style_i}/{layout_i}");
+            }
+        }
+    }
 }
