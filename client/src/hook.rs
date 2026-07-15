@@ -2945,7 +2945,10 @@ mod tests {
         // ponytail: process-global env — fine while this is the only KORE_DIR test.
         unsafe { std::env::set_var("KORE_DIR", &dir) };
         let err = ensure_install_consent("claude").unwrap_err().to_string();
-        assert!(err.contains("hook install"), "points at the consent command: {err}");
+        assert!(
+            err.contains("hook install"),
+            "points at the consent command: {err}"
+        );
         record_install_consent().unwrap();
         ensure_install_consent("claude").unwrap();
         let _ = std::fs::remove_dir_all(&dir);
