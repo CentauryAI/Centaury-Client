@@ -1196,11 +1196,14 @@ fn consent_marker() -> std::path::PathBuf {
 /// Record the one-time hook-install consent (an explicit `hook install` IS
 /// consent — main.rs calls this before install).
 pub fn record_install_consent() -> anyhow::Result<()> {
-    let marker = consent_marker();
+    record_consent_at(&consent_marker())
+}
+
+fn record_consent_at(marker: &std::path::Path) -> anyhow::Result<()> {
     if let Some(dir) = marker.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(&marker, "")?;
+    std::fs::write(marker, "")?;
     Ok(())
 }
 
@@ -1208,8 +1211,12 @@ pub fn record_install_consent() -> anyhow::Result<()> {
 /// (~/.gemini, ~/.codex, ~/.cursor, ~/.kimi-code, ...). Nothing writes there
 /// until the user says yes once: prompt on a tty, bail otherwise.
 pub fn ensure_install_consent(tool: &str) -> anyhow::Result<()> {
+    ensure_consent_at(&consent_marker(), tool)
+}
+
+fn ensure_consent_at(marker: &std::path::Path, tool: &str) -> anyhow::Result<()> {
     use std::io::IsTerminal;
-    if consent_marker().exists() {
+    if marker.exists() {
         return Ok(());
     }
     if std::io::stdin().is_terminal() {
@@ -1220,7 +1227,7 @@ pub fn ensure_install_consent(tool: &str) -> anyhow::Result<()> {
         let mut line = String::new();
         std::io::stdin().read_line(&mut line)?;
         if matches!(line.trim(), "y" | "Y" | "yes") {
-            return record_install_consent();
+            return record_consent_at(marker);
         }
     }
     anyhow::bail!(
@@ -2942,15 +2949,16 @@ mod tests {
     #[test]
     fn install_refuses_without_consent() {
         let dir = std::env::temp_dir().join(format!("kore-consent-test-{}", std::process::id()));
-        // ponytail: process-global env — fine while this is the only KORE_DIR test.
-        unsafe { std::env::set_var("KORE_DIR", &dir) };
-        let err = ensure_install_consent("claude").unwrap_err().to_string();
+        let marker = dir.join("hooks-consent");
+        let err = ensure_consent_at(&marker, "claude")
+            .unwrap_err()
+            .to_string();
         assert!(
             err.contains("hook install"),
             "points at the consent command: {err}"
         );
-        record_install_consent().unwrap();
-        ensure_install_consent("claude").unwrap();
+        record_consent_at(&marker).unwrap();
+        ensure_consent_at(&marker, "claude").unwrap();
         let _ = std::fs::remove_dir_all(&dir);
     }
 
