@@ -535,6 +535,11 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
         return run_batch(args, names);
     }
     if let Some(term) = args.terminal.take() {
+        // Consent here, in the visible terminal — the re-exec'd inner launch
+        // would otherwise prompt inside the freshly spawned window.
+        if !args.no_hooks {
+            crate::hook::ensure_install_consent(&args.tool)?;
+        }
         return spawn_in_terminal(&term, &args);
     }
     // Interactive claude without a prompt just hangs headless (legacy had the

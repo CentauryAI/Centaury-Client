@@ -641,7 +641,11 @@ async fn main() -> anyhow::Result<()> {
         Commands::Hook(HookCommands::Openclaw { event }) => {
             hook::run_plugin_tool("openclaw", &event).await?
         }
-        Commands::Hook(HookCommands::Install { user, tool }) => hook::install(&tool, user)?,
+        Commands::Hook(HookCommands::Install { user, tool }) => {
+            // The explicit command IS the consent — never prompt here.
+            hook::record_install_consent()?;
+            hook::install(&tool, user)?
+        }
         Commands::Hook(HookCommands::Status { user }) => hook::status(user)?,
         Commands::Hook(HookCommands::Uninstall { tool, user }) => hook::uninstall(&tool, user)?,
         Commands::Waker {
