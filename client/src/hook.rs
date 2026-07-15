@@ -1189,9 +1189,51 @@ centaury status doing a big refactor in auth.rs
 - Offline agents still get your message when they return (server stores it).
 "#;
 
+fn consent_marker() -> std::path::PathBuf {
+    crate::config::kore_dir().join("hooks-consent")
+}
+
+/// Record the one-time hook-install consent (an explicit `hook install` IS
+/// consent — main.rs calls this before install).
+pub fn record_install_consent() -> anyhow::Result<()> {
+    let marker = consent_marker();
+    if let Some(dir) = marker.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(&marker, "")?;
+    Ok(())
+}
+
+/// Hook install writes into the TOOL's own config files — often user-global
+/// (~/.gemini, ~/.codex, ~/.cursor, ~/.kimi-code, ...). Nothing writes there
+/// until the user says yes once: prompt on a tty, bail otherwise.
+pub fn ensure_install_consent(tool: &str) -> anyhow::Result<()> {
+    use std::io::IsTerminal;
+    if consent_marker().exists() {
+        return Ok(());
+    }
+    if std::io::stdin().is_terminal() {
+        eprint!(
+            "centaury will install {tool} hooks + skill into {tool}'s config files \
+             (one-time consent; `centaury hook uninstall --tool all` reverts). Continue? [y/N] "
+        );
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line)?;
+        if matches!(line.trim(), "y" | "Y" | "yes") {
+            return record_install_consent();
+        }
+    }
+    anyhow::bail!(
+        "hooks not installed — run `centaury hook install --tool {tool}` once to consent, \
+         or launch with --no-hooks"
+    )
+}
+
 /// Install kore hooks for a tool. claude honors user_scope; gemini/codex only
 /// have global config dirs; opencode/kilo/cline install project-local files.
+/// Consent-gated: first ever install asks (or bails when non-interactive).
 pub fn install(tool: &str, user_scope: bool) -> anyhow::Result<()> {
+    ensure_install_consent(tool)?;
     match tool {
         "claude" => install_claude(user_scope),
         "gemini" => install_gemini(),
@@ -2894,6 +2936,20 @@ pub fn uninstall(tool: &str, user_scope: bool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Consent gate: with no marker and no tty (cargo test), install must
+    /// refuse; recording consent (what `hook install` does) unlocks it.
+    #[test]
+    fn install_refuses_without_consent() {
+        let dir = std::env::temp_dir().join(format!("kore-consent-test-{}", std::process::id()));
+        // ponytail: process-global env — fine while this is the only KORE_DIR test.
+        unsafe { std::env::set_var("KORE_DIR", &dir) };
+        let err = ensure_install_consent("claude").unwrap_err().to_string();
+        assert!(err.contains("hook install"), "points at the consent command: {err}");
+        record_install_consent().unwrap();
+        ensure_install_consent("claude").unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// HC6: trust write must be surgical (user config + foreign hook entries
     /// survive byte-for-byte) and the is-current check must key on version —
