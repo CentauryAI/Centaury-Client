@@ -722,19 +722,19 @@ async fn self_assign_from_env() {
     let Ok(token) = config::load_token() else {
         return;
     };
-    if let Ok(spec) = std::env::var("KORE_ROLE") {
-        if let Ok((title, kind, value)) = crate::cadence::parse_role_spec(&spec) {
-            let _ = config::http_client()
-                .patch(format!("{}/v1/instances/self/role", config::server_url()))
-                .bearer_auth(&token)
-                .json(&kore_protocol::api::AssignRoleRequest {
-                    role: Some(title),
-                    cadence_kind: Some(kind),
-                    cadence_value: Some(value),
-                })
-                .send()
-                .await;
-        }
+    if let Ok(spec) = std::env::var("KORE_ROLE")
+        && let Ok((title, kind, value)) = crate::cadence::parse_role_spec(&spec)
+    {
+        let _ = config::http_client()
+            .patch(format!("{}/v1/instances/self/role", config::server_url()))
+            .bearer_auth(&token)
+            .json(&kore_protocol::api::AssignRoleRequest {
+                role: Some(title),
+                cadence_kind: Some(kind),
+                cadence_value: Some(value),
+            })
+            .send()
+            .await;
     }
     if let Ok(raw) = std::env::var("KORE_SKILLS") {
         let skills: Vec<_> = raw
@@ -764,13 +764,12 @@ async fn cadence_reminders_inner(tool: &str) -> Option<String> {
     let mut st = load_inject_state(&name);
     let now = now_unix();
     // Keep the hot mid-turn path off the network: refetch at most every TTL.
-    if st.fetched_unix == 0 || now.saturating_sub(st.fetched_unix) > INJECT_STATE_TTL_SECS {
-        if let Ok(cfg) =
+    if (st.fetched_unix == 0 || now.saturating_sub(st.fetched_unix) > INJECT_STATE_TTL_SECS)
+        && let Ok(cfg) =
             crate::get_json::<InstanceInjectConfig>("/v1/instances/self/inject-config").await
-        {
-            st.items = cfg.items;
-            st.fetched_unix = now;
-        }
+    {
+        st.items = cfg.items;
+        st.fetched_unix = now;
     }
     if st.items.is_empty() {
         save_inject_state(&name, &st);
@@ -2131,14 +2130,13 @@ fn kimi_strip(doc: &mut toml_edit::DocumentMut) {
     if let Some(Item::ArrayOfTables(arr)) = doc.get_mut("hooks") {
         let mut kept = ArrayOfTables::new();
         for i in 0..arr.len() {
-            if let Some(t) = arr.get(i) {
-                if !t
+            if let Some(t) = arr.get(i)
+                && !t
                     .get("command")
                     .and_then(|v| v.as_str())
                     .is_some_and(is_kore_kimi_command)
-                {
-                    kept.push(t.clone());
-                }
+            {
+                kept.push(t.clone());
             }
         }
         *arr = kept;
@@ -2146,22 +2144,22 @@ fn kimi_strip(doc: &mut toml_edit::DocumentMut) {
             doc.remove("hooks");
         }
     }
-    if let Some(Item::Table(perm)) = doc.get_mut("permission") {
-        if let Some(Item::ArrayOfTables(arr)) = perm.get_mut("rules") {
-            let mut kept = ArrayOfTables::new();
-            for i in 0..arr.len() {
-                if let Some(t) = arr.get(i) {
-                    let ours = t
-                        .get("pattern")
-                        .and_then(|v| v.as_str())
-                        .is_some_and(|p| kimi_permission_patterns().iter().any(|k| k == p));
-                    if !ours {
-                        kept.push(t.clone());
-                    }
+    if let Some(Item::Table(perm)) = doc.get_mut("permission")
+        && let Some(Item::ArrayOfTables(arr)) = perm.get_mut("rules")
+    {
+        let mut kept = ArrayOfTables::new();
+        for i in 0..arr.len() {
+            if let Some(t) = arr.get(i) {
+                let ours = t
+                    .get("pattern")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(|p| kimi_permission_patterns().iter().any(|k| k == p));
+                if !ours {
+                    kept.push(t.clone());
                 }
             }
-            *arr = kept;
         }
+        *arr = kept;
     }
 }
 
@@ -2420,10 +2418,10 @@ fn install_ts_plugin(tool: &str, dir: &str) -> anyhow::Result<()> {
 const PI_PLUGIN: &str = include_str!("plugins/centaury-pi.ts");
 
 fn pi_extensions_dir(tool: &str) -> std::path::PathBuf {
-    if let Ok(d) = std::env::var("PI_CODING_AGENT_DIR") {
-        if !d.is_empty() {
-            return std::path::PathBuf::from(d).join("extensions");
-        }
+    if let Ok(d) = std::env::var("PI_CODING_AGENT_DIR")
+        && !d.is_empty()
+    {
+        return std::path::PathBuf::from(d).join("extensions");
     }
     let home = dirs::home_dir().unwrap_or_default();
     let base = if tool == "omp" { ".omp" } else { ".pi" };
