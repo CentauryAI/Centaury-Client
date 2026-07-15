@@ -3,11 +3,11 @@
 // server owns cursors/replay/identity, so no local DB, notify server, ack
 // bookkeeping or reconcile timers — the plugin only bridges three moments:
 //
-//   session.created  -> `kore-client hook TOOL session-start` (register,
+//   session.created  -> `centaury hook TOOL session-start` (register,
 //                       bootstrap text cached, injected with the 1st message)
-//   chat.message     -> `kore-client hook TOOL drain` (pending messages ride
+//   chat.message     -> `centaury hook TOOL drain` (pending messages ride
 //                       along as an extra part, claude-parity prompt drain)
-//   idle             -> `kore-client hook TOOL wait` (blocks server-side up
+//   idle             -> `centaury hook TOOL wait` (blocks server-side up
 //                       to KORE_HOOK_TIMEOUT; any messages re-enter the agent
 //                       via promptAsync — the legacy delivery loop, minus the
 //                       machinery)
@@ -29,10 +29,10 @@ export const KorePlugin: Plugin = async ({ client, $ }) => {
 
   async function kore(event: string): Promise<string> {
     try {
-      const r = await $.nothrow()`kore-client hook ${TOOL} ${event}`.quiet()
+      const r = await $.nothrow()`centaury hook ${TOOL} ${event}`.quiet()
       return r.exitCode === 0 ? r.text() : ""
     } catch {
-      return "" // kore-client missing/unreachable: never break the host tool
+      return "" // centaury missing/unreachable: never break the host tool
     }
   }
 
@@ -41,7 +41,7 @@ export const KorePlugin: Plugin = async ({ client, $ }) => {
     waiting = true
     try {
       // Re-arm on empty returns (hcom 97c8304 concept, kore-shaped): `wait`
-      // returns "" on KORE_HOOK_TIMEOUT with no traffic AND on kore-client
+      // returns "" on KORE_HOOK_TIMEOUT with no traffic AND on centaury
       // errors — without a loop the agent goes deaf until the next user
       // prompt. Backoff keeps a dead server from becoming a spawn storm.
       // ponytail: sid can go stale if the user switches sessions; the failed

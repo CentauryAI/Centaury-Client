@@ -9,10 +9,10 @@
     "types": ["bun", "node"]
   },
   "include": ["*.ts"],
-  // kore-openclaw.ts is excluded from the gate on purpose: OpenClaw's plugin
+  // centaury-openclaw.ts is excluded from the gate on purpose: OpenClaw's plugin
   // SDK ships inside the full gateway daemon (~54 deps, native modules) — too
   // heavy/fragile to add as a devDep just to typecheck a 30-line plugin. It is
   // verified out-of-band against the real openclaw@2026.6.11 d.ts instead.
   // Re-verify against upstream on OpenClaw upgrades.
-  "exclude": ["kore-openclaw.ts"]
+  "exclude": ["centaury-openclaw.ts"]
 }

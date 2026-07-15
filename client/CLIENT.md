@@ -1,6 +1,6 @@
-# kore-client 圖
+# centaury 圖
 
-厚客戶端，僅連 agent 於 kore 雲。Crate: `kore-client`。倚 `kore-protocol`（共享型）。
+厚客戶端，僅連 agent 於 kore 雲。Crate: `centaury`。倚 `kore-protocol`（共享型）。
 
 ## 檔案關係
 
@@ -70,7 +70,7 @@ kore 之 push 側。伺服器即 inbox（watermark+replay），故 hook 薄：�
 - `prompt_drain()`: 同 drain，無 timeout 等待首則（有即報，無即靜默過）
 - `drain_into(socket, out)`: loop 以 DRAIN_WINDOW 逐條吸收已到達 delivery
 - `format_messages()`: 組訊息文字，含 thread/reply_to meta，尾附回覆指引
-- `KORE_SKILL`: 內嵌 skill 內容（教 agent 用 kore-client 之指令），install 時寫入 `.claude/skills/kore/SKILL.md`
+- `KORE_SKILL`: 內嵌 skill 內容（教 agent 用 centaury 之指令），install 時寫入 `.claude/skills/kore/SKILL.md`
 - `install(user_scope)`: 合併 hooks 進 `.claude/settings.json`（Stop timeout 86400，UserPromptSubmit/SessionStart 各30），寫 skill 檔
 
 ## commands/send.rs

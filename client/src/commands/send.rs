@@ -150,7 +150,7 @@ fn resolve_message_text(
         1 => return Ok(bare_words.into_iter().next().unwrap()),
         n if n > 1 => {
             return Err(
-                "Multiple bare words — put your message after '--':\n  kore-client send @target -- your message"
+                "Multiple bare words — put your message after '--':\n  centaury send @target -- your message"
                     .to_string(),
             );
         }
@@ -161,7 +161,7 @@ fn resolve_message_text(
         return read_stdin();
     }
 
-    Err("No message provided.\nUse: kore-client send @target -- your message".to_string())
+    Err("No message provided.\nUse: centaury send @target -- your message".to_string())
 }
 
 pub async fn run(args: SendArgs) -> anyhow::Result<()> {
@@ -232,7 +232,7 @@ pub async fn run(args: SendArgs) -> anyhow::Result<()> {
             Ok(Ok(None)) => anyhow::bail!("connection closed before a reply arrived"),
             Ok(Err(e)) => return Err(e),
             Err(_) => anyhow::bail!(
-                "no reply to #{} within {}s — recipient may answer later (kore-client send --reply-to {})",
+                "no reply to #{} within {}s — recipient may answer later (centaury send --reply-to {})",
                 body.id,
                 args.timeout,
                 body.id

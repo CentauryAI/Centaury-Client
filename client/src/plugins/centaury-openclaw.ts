@@ -11,8 +11,8 @@
 // zero extra delivery here while adding a config gate + the D12 loss window.
 //
 //   before_prompt_build -> appendContext =
-//       `kore-client hook openclaw session-start` (register + bootstrap, once) +
-//       `kore-client hook openclaw drain` (pending messages, every turn)
+//       `centaury hook openclaw session-start` (register + bootstrap, once) +
+//       `centaury hook openclaw drain` (pending messages, every turn)
 //
 // Every turn the daemon takes (a channel inbound, a heartbeat), pending kore
 // messages ride in as appended context. `before_prompt_build` is not one of the
@@ -32,10 +32,10 @@ const TOOL = "openclaw"
 function kore(event: string): Promise<string> {
   return new Promise((resolve) => {
     try {
-      const child = spawn("kore-client", ["hook", TOOL, event])
+      const child = spawn("centaury", ["hook", TOOL, event])
       let out = ""
       child.stdout.on("data", (c: Buffer) => (out += c.toString()))
-      child.on("error", () => resolve("")) // kore-client missing: never break the host
+      child.on("error", () => resolve("")) // centaury missing: never break the host
       child.on("close", (code) => resolve(code === 0 ? out : ""))
     } catch {
       resolve("")

@@ -4,7 +4,7 @@ Thin client layer: connections + UI only, zero product logic (SaaS split — log
 
 ## Structure
 
-- `client/` — CLI/TUI (`kore-client`), Rust, MIT
+- `client/` — CLI/TUI (`centaury`), Rust, MIT
 - `desktop/` — GUI app (Tauri v2 + React 19 + Vite + Tailwind v4 + shadcn)
 
 ## External dependencies
@@ -26,7 +26,7 @@ Thin client layer: connections + UI only, zero product logic (SaaS split — log
 ## Build
 
 ```bash
-cargo build -p kore-client           # CLI
+cargo build -p centaury           # CLI
 cd desktop && pnpm install && pnpm build   # frontend
 cd desktop && pnpm tauri dev         # full app
 ```

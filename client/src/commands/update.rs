@@ -7,16 +7,16 @@
 
 use crate::config;
 
-const REPO: &str = "Solar2004/kore-client";
+const REPO: &str = "CentauryAI/Centaury-Client";
 const CURRENT: &str = env!("CARGO_PKG_VERSION");
 
 /// Release asset for this platform — names must match .github/workflows/release.yml.
 fn asset_name() -> anyhow::Result<&'static str> {
     Ok(match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("linux", "x86_64") => "kore-client-x86_64-linux",
-        ("macos", "aarch64") => "kore-client-aarch64-macos",
-        ("macos", "x86_64") => "kore-client-x86_64-macos",
-        ("windows", "x86_64") => "kore-client-x86_64-windows.exe",
+        ("linux", "x86_64") => "centaury-x86_64-linux",
+        ("macos", "aarch64") => "centaury-aarch64-macos",
+        ("macos", "x86_64") => "centaury-x86_64-macos",
+        ("windows", "x86_64") => "centaury-x86_64-windows.exe",
         (os, arch) => anyhow::bail!("no prebuilt binary for {os}-{arch} — build from source"),
     })
 }
@@ -60,12 +60,12 @@ async fn latest_version(timeout: std::time::Duration) -> anyhow::Result<String> 
     Ok(tag)
 }
 
-/// `kore-client update`: download this platform's asset from the latest
+/// `centaury update`: download this platform's asset from the latest
 /// release and swap it over the running binary.
 pub async fn run() -> anyhow::Result<()> {
     let latest = latest_version(std::time::Duration::from_secs(10)).await?;
     if parse(&latest) <= parse(CURRENT) {
-        println!("kore-client v{CURRENT} is up to date (latest: {latest})");
+        println!("centaury v{CURRENT} is up to date (latest: {latest})");
         return Ok(());
     }
     let asset = asset_name()?;
@@ -138,7 +138,7 @@ pub async fn print_hint() {
         }
     };
     if parse(&latest) > parse(CURRENT) {
-        println!("[kore] update available: v{CURRENT} → {latest} — run `kore-client update`");
+        println!("[kore] update available: v{CURRENT} → {latest} — run `centaury update`");
     }
 }
 

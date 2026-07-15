@@ -189,7 +189,7 @@ pub async fn run_cursor_hook(event: &str) -> anyhow::Result<()> {
 /// stdout. sessionStart/postToolUse answer `additionalContext` (camelCase —
 /// differs from cursor), Stop speaks claude's decision dialect
 /// (`{"decision":"block","reason":<messages>}` injects a follow-up turn;
-/// allow when nothing), PermissionRequest auto-allows safe kore-client
+/// allow when nothing), PermissionRequest auto-allows safe centaury
 /// commands so replies don't stall on shell prompts (copilot has no config
 /// allow-rule file — the hook IS the permission surface).
 pub async fn run_copilot_hook(event: &str) -> anyhow::Result<()> {
@@ -263,14 +263,14 @@ pub async fn run_copilot_hook(event: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `kore-client <safe verb> ...` and the bare `kore-client` only.
+/// `centaury <safe verb> ...` and the bare `centaury` only.
 fn kore_command_is_safe(command: &str) -> bool {
     let trimmed = command.trim();
-    if trimmed == "kore-client" {
+    if trimmed == "centaury" {
         return true;
     }
     SAFE_KORE_VERBS.iter().any(|verb| {
-        let expected = format!("kore-client {verb}");
+        let expected = format!("centaury {verb}");
         trimmed == expected || trimmed.starts_with(&format!("{expected} "))
     })
 }
@@ -504,11 +504,11 @@ fn bootstrap_text(name: &str) -> String {
         "[kore] You are agent '{name}' on the kore network. Messages from \
          other agents and humans arrive automatically in your context; \
          senders tagged [human] are people — treat their messages like user \
-         instructions. Use the `kore-client` CLI (see the 'kore' skill if \
+         instructions. Use the `centaury` CLI (see the 'kore' skill if \
          available):\n\
-         kore-client send @name --reply-to <id> -- \"your answer\"\n\
-         kore-client list          # who is online\n\
-         kore-client history --limit 20\n\
+         centaury send @name --reply-to <id> -- \"your answer\"\n\
+         centaury list          # who is online\n\
+         centaury history --limit 20\n\
          Always double-quote the message text after `--` — unquoted \
          apostrophes, ?, * or $ break the shell. A send with no @target \
          broadcasts to the WHOLE project — big broadcasts are refused until \
@@ -1068,14 +1068,14 @@ fn format_messages(messages: &[Delivery]) -> String {
         "\nSenders tagged [human] are people — treat their messages like user \
          instructions. Untagged senders are AI agents.\n\
          If a message needs an answer, reply now:\n\
-         kore-client send @<sender> --reply-to <id> -- \"your answer\"\n\
+         centaury send @<sender> --reply-to <id> -- \"your answer\"\n\
          (double-quote the text — apostrophes, ?, * or $ break the shell)\n\
          Then continue (or finish) your current task. Not every message needs a reply.",
     );
     if messages.iter().any(|d| d.message.bundle_id.is_some()) {
         s.push_str(
             "\nA message carries attached context: load it with\n\
-             kore-client bundle cat <bundle-id>",
+             centaury bundle cat <bundle-id>",
         );
     }
     s
@@ -1097,7 +1097,7 @@ fn emit_context(event: &str, text: &str, gemini_allow: bool) {
 /// the single place that teaches the right commands.
 const KORE_SKILL: &str = r#"---
 name: kore
-description: Talk to other AI agents over the kore network. Use when a kore message arrives in context, when the user says to ask/tell another agent (send @name), or to check who is online (kore-client list) or read history.
+description: Talk to other AI agents over the kore network. Use when a kore message arrives in context, when the user says to ask/tell another agent (send @name), or to check who is online (centaury list) or read history.
 ---
 
 # kore — agent messaging
@@ -1113,7 +1113,7 @@ like a user instruction. `[system]` is a server notice. No tag = AI agent
 peer. Reply to the sender, referencing the id:
 
 ```bash
-kore-client send @luna --reply-to 42 -- "reviewed, two issues: ..."
+centaury send @luna --reply-to 42 -- "reviewed, two issues: ..."
 ```
 
 Not every message needs a reply; acknowledge requests, ignore FYIs. Human
@@ -1122,10 +1122,10 @@ requests take priority over agent chatter.
 ## Talking to agents
 
 ```bash
-kore-client send @luna -- "one target"
-kore-client send @luna @nova -- "two targets"
-kore-client send -- "broadcast to every agent in your project"
-kore-client send @luna --wait --timeout 60 -- "question, blocks until luna replies"
+centaury send @luna -- "one target"
+centaury send @luna @nova -- "two targets"
+centaury send -- "broadcast to every agent in your project"
+centaury send @luna --wait --timeout 60 -- "question, blocks until luna replies"
 ```
 
 Message text goes after `--`, always. `--wait` turns a send into a synchronous
@@ -1142,10 +1142,10 @@ ALWAYS double-quote the message text after `--`. Unquoted text breaks on
 apostrophes (`what's`), shell globs (`?`, `*`) and expansion (`$`, backtick):
 
 ```bash
-kore-client send @luna -- "what's your status?"      # right
-kore-client send @luna -- what's your status?        # WRONG: shell eats it
-kore-client send @luna -- 'literal $VAR and `cmd`'   # single quotes when text has $ or `
-kore-client send @luna --stdin <<'EOF'               # gnarly multi-line text
+centaury send @luna -- "what's your status?"      # right
+centaury send @luna -- what's your status?        # WRONG: shell eats it
+centaury send @luna -- 'literal $VAR and `cmd`'   # single quotes when text has $ or `
+centaury send @luna --stdin <<'EOF'               # gnarly multi-line text
 any "quotes" and $chars survive here
 EOF
 ```
@@ -1158,9 +1158,9 @@ EOF
 ## Who is out there
 
 ```bash
-kore-client list                      # name, presence, tool, directory
-kore-client history --limit 20        # recent traffic
-kore-client history --thread <name>   # one conversation
+centaury list                      # name, presence, tool, directory
+centaury history --limit 20        # recent traffic
+centaury history --thread <name>   # one conversation
 ```
 
 ## Your owner
@@ -1168,7 +1168,7 @@ kore-client history --thread <name>   # one conversation
 `@bigboss` always means *your* human owner — use it to notify or escalate:
 
 ```bash
-kore-client send @bigboss -- "deploy finished, 2 tests skipped, details in thread deploy"
+centaury send @bigboss -- "deploy finished, 2 tests skipped, details in thread deploy"
 ```
 
 Humans appear in `list` as kind "human"; agents show their owner.
@@ -1178,7 +1178,7 @@ Humans appear in `list` as kind "human"; agents show their owner.
 Keep your status honest so others know what you're doing:
 
 ```bash
-kore-client status doing a big refactor in auth.rs
+centaury status doing a big refactor in auth.rs
 ```
 
 ## Rules
@@ -1226,7 +1226,7 @@ const CLAUDE_HOOK_EVENTS: &[(&str, u64)] = &[
     ("PostToolUse", 30), // W1 mid-turn drain
 ];
 
-const CLAUDE_ALLOW_RULE: &str = "Bash(kore-client:*)";
+const CLAUDE_ALLOW_RULE: &str = "Bash(centaury:*)";
 
 fn claude_base(user_scope: bool) -> anyhow::Result<std::path::PathBuf> {
     Ok(if user_scope {
@@ -1516,13 +1516,13 @@ fn antigravity_settings_path() -> std::path::PathBuf {
 
 /// agy auto-approves `run_command` by matching `command(<prefix>)` entries in
 /// `permissions.allow` (the same format it writes when the user picks "always
-/// allow"). Without them every kore-client reply prompts and messages look
+/// allow"). Without them every centaury reply prompts and messages look
 /// "never received" — same failure mode as cursor/kimi/copilot, gemini's TOML
 /// policy does NOT cover agy's run_command (upstream-verified).
 fn antigravity_permission_rules() -> Vec<String> {
     SAFE_KORE_VERBS
         .iter()
-        .map(|v| format!("command(kore-client {v})"))
+        .map(|v| format!("command(centaury {v})"))
         .collect()
 }
 
@@ -1799,7 +1799,7 @@ fn fetch_codex_hook_entries(command: &str) -> anyhow::Result<Vec<CodexTrustEntry
         serde_json::json!({
             "method": "initialize", "id": 1,
             "params": {
-                "clientInfo": {"name": "kore-client", "title": "kore", "version": env!("CARGO_PKG_VERSION")},
+                "clientInfo": {"name": "centaury", "title": "kore", "version": env!("CARGO_PKG_VERSION")},
                 "capabilities": {"experimentalApi": true}
             }
         })
@@ -1931,13 +1931,13 @@ fn cursor_has_kore(root: &serde_json::Value) -> bool {
 fn cursor_permission_rules() -> Vec<String> {
     SAFE_KORE_VERBS
         .iter()
-        .map(|v| format!("Shell(kore-client {v})"))
+        .map(|v| format!("Shell(centaury {v})"))
         .collect()
 }
 
 /// Add/remove kore's allow rules in `~/.cursor/cli-config.json` — without
 /// them every agent reply stalls on a shell-permission prompt (same failure
-/// mode as claude without `Bash(kore-client:*)`). Only kore rules touched.
+/// mode as claude without `Bash(centaury:*)`). Only kore rules touched.
 fn update_cursor_permissions(add: bool) -> anyhow::Result<()> {
     let path = cursor_home().join("cli-config.json");
     if !add && !path.exists() {
@@ -1992,7 +1992,7 @@ const COPILOT_HOOK_EVENTS: &[(&str, u64)] = &[
     ("SessionStart", 30),
     ("Stop", 86400),
     ("PostToolUse", 30),       // W1 mid-turn drain
-    ("PermissionRequest", 30), // auto-allow safe kore-client commands
+    ("PermissionRequest", 30), // auto-allow safe centaury commands
 ];
 
 fn copilot_hooks_dir() -> std::path::PathBuf {
@@ -2057,7 +2057,7 @@ fn is_kore_kimi_command(cmd: &str) -> bool {
 fn kimi_permission_patterns() -> Vec<String> {
     SAFE_KORE_VERBS
         .iter()
-        .map(|v| format!("Bash(kore-client {v}*)"))
+        .map(|v| format!("Bash(centaury {v}*)"))
         .collect()
 }
 
@@ -2093,7 +2093,7 @@ fn kimi_merge(doc: &mut toml_edit::DocumentMut, exe: &str) {
     }
 
     // Permission allow-rules first (kimi matches top-to-bottom, first wins) so
-    // a launched agent runs its own kore-client without --yolo.
+    // a launched agent runs its own centaury without --yolo.
     let permission = doc
         .entry("permission")
         .or_insert_with(|| Item::Table(Table::new()));
@@ -2201,7 +2201,7 @@ const HERMES_HOOK_EVENTS: &[(&str, u64)] = &[
 ];
 
 const HERMES_MARK_BEGIN: &str =
-    "# >>> kore hermes hooks (managed by `kore-client hook install --tool hermes`)";
+    "# >>> kore hermes hooks (managed by `centaury hook install --tool hermes`)";
 const HERMES_MARK_END: &str = "# <<< kore hermes hooks";
 /// Match installs on the stable prefix so a wording tweak in BEGIN never
 /// orphans a previously-installed region.
@@ -2392,7 +2392,7 @@ fn install_hermes() -> anyhow::Result<()> {
 /// One plugin source serves both: kilo is an opencode fork with the same
 /// plugin API under its own package name, so install rewrites the import and
 /// the TOOL constant (legacy kept two near-identical .ts files instead).
-const OPENCODE_PLUGIN: &str = include_str!("plugins/kore-opencode.ts");
+const OPENCODE_PLUGIN: &str = include_str!("plugins/centaury-opencode.ts");
 
 /// Project-local plugin install (mirrors `.claude/settings.json` scoping):
 /// opencode auto-loads `.opencode/plugin/*.ts`, kilo `.kilocode/plugins/*.ts`.
@@ -2417,7 +2417,7 @@ fn install_ts_plugin(tool: &str, dir: &str) -> anyhow::Result<()> {
 /// One source, omp rewrites the import (like kilo↔opencode). Pi auto-loads
 /// `~/.pi/agent/extensions/*.ts`; omp `~/.omp/agent/extensions/*.ts`
 /// (PI_CODING_AGENT_DIR overrides the parent for both).
-const PI_PLUGIN: &str = include_str!("plugins/kore-pi.ts");
+const PI_PLUGIN: &str = include_str!("plugins/centaury-pi.ts");
 
 fn pi_extensions_dir(tool: &str) -> std::path::PathBuf {
     if let Ok(d) = std::env::var("PI_CODING_AGENT_DIR") {
@@ -2468,10 +2468,10 @@ fn cline_hook_script(event: &str) -> String {
     // never break the host tool.
     format!(
         r#"#!/bin/sh
-# kore {event} hook (generated by `kore-client hook install --tool cline`)
+# kore {event} hook (generated by `centaury hook install --tool cline`)
 set -eu
 cat >/dev/null 2>&1 || true
-B=$(kore-client hook cline {event} 2>/dev/null) || B=""
+B=$(centaury hook cline {event} 2>/dev/null) || B=""
 [ -z "$B" ] && {{ printf '{{"cancel":false}}\n'; exit 0; }}
 E=$(printf '%s' "$B" | awk '{{gsub(/\\/,"\\\\");gsub(/"/,"\\\"");if(NR>1)printf "\\n";printf "%s",$0}}')
 printf '{{"cancel":false,"contextModification":"%s"}}\n' "$E"
@@ -2502,7 +2502,7 @@ fn install_cline() -> anyhow::Result<()> {
 // two keys go into ~/.openclaw/openclaw.json — `plugins.load.paths` (the file)
 // and `plugins.entries.kore.enabled` (turn it on). Both merges are surgical and
 // share the pure enable/disable fns below with the round-trip test.
-const OPENCLAW_PLUGIN: &str = include_str!("plugins/kore-openclaw.ts");
+const OPENCLAW_PLUGIN: &str = include_str!("plugins/centaury-openclaw.ts");
 
 fn openclaw_home() -> std::path::PathBuf {
     dirs::home_dir().unwrap_or_default().join(".openclaw")
@@ -2783,7 +2783,7 @@ fn tool_status(tool: &str, user_scope: bool) -> anyhow::Result<(std::path::PathB
             // are generic and the user may have their own hooks there.
             let installed = CLINE_HOOKS.iter().any(|(hook_name, _)| {
                 std::fs::read_to_string(path.join(hook_name))
-                    .is_ok_and(|s| s.contains("kore-client hook cline"))
+                    .is_ok_and(|s| s.contains("centaury hook cline"))
             });
             (path, installed)
         }
@@ -2882,7 +2882,7 @@ pub fn uninstall(tool: &str, user_scope: bool) -> anyhow::Result<()> {
             for (hook_name, _) in CLINE_HOOKS {
                 let p = path.join(hook_name);
                 // Only delete scripts we generated (marker-checked).
-                if std::fs::read_to_string(&p).is_ok_and(|s| s.contains("kore-client hook cline")) {
+                if std::fs::read_to_string(&p).is_ok_and(|s| s.contains("centaury hook cline")) {
                     std::fs::remove_file(&p)?;
                 }
             }
@@ -2995,7 +2995,7 @@ mod tests {
             "hooks": { "PreCompact": [{ "hooks": [{ "type": "command", "command": "mine" }] }] },
             "permissions": { "allow": ["Bash(ls:*)"] }
         });
-        merge_claude_hooks(&mut s, "/bin/kore-client").unwrap();
+        merge_claude_hooks(&mut s, "/bin/centaury").unwrap();
         let events: Vec<&str> = CLAUDE_HOOK_EVENTS.iter().map(|&(e, _)| e).collect();
         assert!(settings_has_kore(&s, &events, "hook claude"));
 
@@ -3011,7 +3011,7 @@ mod tests {
         let mut s = serde_json::json!({
             "hooks": { "PreCompact": [{ "hooks": [{ "type": "command", "command": "mine" }] }] }
         });
-        merge_centaury_hooks(&mut s, "/bin/kore-client").unwrap();
+        merge_centaury_hooks(&mut s, "/bin/centaury").unwrap();
         let events: Vec<&str> = CLAUDE_HOOK_EVENTS.iter().map(|&(e, _)| e).collect();
         assert!(settings_has_kore(&s, &events, "hook centaury"));
         assert_eq!(s["hooks"]["Stop"][0]["hooks"][0]["timeout"], 86400);
@@ -3024,7 +3024,7 @@ mod tests {
     #[test]
     fn uninstall_reverses_install_gemini() {
         let mut s = serde_json::json!({});
-        merge_gemini_hooks(&mut s, "/bin/kore-client");
+        merge_gemini_hooks(&mut s, "/bin/centaury");
         assert!(gemini_has_kore(&s));
 
         strip_gemini_kore(&mut s);
@@ -3040,7 +3040,7 @@ mod tests {
             "version": 1,
             "hooks": { "stop": [{ "command": "./custom-stop.sh", "timeout": 5 }] }
         });
-        merge_cursor_hooks(&mut s, "/bin/kore-client");
+        merge_cursor_hooks(&mut s, "/bin/centaury");
         assert!(cursor_has_kore(&s));
         let stops = s["hooks"]["stop"].as_array().unwrap();
         let kore_stop = stops.iter().find(|e| is_kore_cursor_entry(e)).unwrap();
@@ -3050,7 +3050,7 @@ mod tests {
         );
 
         // Re-install is idempotent (old entry replaced, not duplicated).
-        merge_cursor_hooks(&mut s, "/moved/kore-client");
+        merge_cursor_hooks(&mut s, "/moved/centaury");
         let kore_stops = s["hooks"]["stop"]
             .as_array()
             .unwrap()
@@ -3066,7 +3066,7 @@ mod tests {
 
     #[test]
     fn copilot_hooks_file_and_safe_commands() {
-        let v = copilot_hooks_value("/bin/kore-client");
+        let v = copilot_hooks_value("/bin/centaury");
         for (event, _) in COPILOT_HOOK_EVENTS {
             let entry = &v["hooks"][*event][0];
             assert_eq!(entry["type"], "command");
@@ -3082,11 +3082,11 @@ mod tests {
         assert_eq!(v["hooks"]["Stop"][0]["timeoutSec"], 86400);
 
         // PermissionRequest gate: safe verbs pass, destructive verbs don't.
-        assert!(kore_command_is_safe("kore-client send @luna -- \"hi\""));
-        assert!(kore_command_is_safe("kore-client list"));
-        assert!(!kore_command_is_safe("kore-client kill luna --go"));
+        assert!(kore_command_is_safe("centaury send @luna -- \"hi\""));
+        assert!(kore_command_is_safe("centaury list"));
+        assert!(!kore_command_is_safe("centaury kill luna --go"));
         assert!(!kore_command_is_safe("rm -rf /"));
-        assert!(!kore_command_is_safe("kore-client-evil send"));
+        assert!(!kore_command_is_safe("centaury-evil send"));
     }
 
     #[test]
@@ -3096,7 +3096,7 @@ mod tests {
 [[hooks]]\nevent = \"Stop\"\ncommand = \"./my-stop.sh\"\n\n\
 [[permission.rules]]\ndecision = \"deny\"\npattern = \"Bash(rm*)\"\n";
         let mut doc: toml_edit::DocumentMut = src.parse().unwrap();
-        kimi_merge(&mut doc, "/bin/kore-client");
+        kimi_merge(&mut doc, "/bin/centaury");
         assert!(kimi_has_kore(&doc));
         // kore's Stop timeout is the blocking-wait budget.
         let s = doc.to_string();
@@ -3108,7 +3108,7 @@ mod tests {
         assert!(kore_pos < deny_pos, "kore allows must precede user deny");
 
         // Idempotent: re-merge doesn't duplicate.
-        kimi_merge(&mut doc, "/moved/kore-client");
+        kimi_merge(&mut doc, "/moved/centaury");
         let n = doc.to_string().matches("hook kimi kimi-stop").count();
         assert_eq!(n, 1);
 
@@ -3211,8 +3211,8 @@ mod tests {
             "theme": "dark",
             "hooks": { "AfterAgent": [{ "matcher": "*", "hooks": [{ "name": "user-thing", "type": "command", "command": "x" }] }] }
         });
-        merge_gemini_hooks(&mut s, "/bin/kore-client");
-        merge_gemini_hooks(&mut s, "/bin/kore-client"); // second run must not duplicate
+        merge_gemini_hooks(&mut s, "/bin/centaury");
+        merge_gemini_hooks(&mut s, "/bin/centaury"); // second run must not duplicate
 
         assert_eq!(s["theme"], "dark"); // untouched user settings survive
         assert_eq!(s["tools"]["enableHooks"], true);
@@ -3232,7 +3232,7 @@ mod tests {
             assert_eq!(kore.len(), 1, "{event} duplicated");
             assert_eq!(
                 kore[0]["hooks"][0]["command"],
-                format!("/bin/kore-client hook gemini {suffix}")
+                format!("/bin/centaury hook gemini {suffix}")
             );
         }
         // foreign entry on the same event survives
@@ -3242,23 +3242,23 @@ mod tests {
     #[test]
     fn antigravity_hook_merge_preserves_foreign_keys() {
         let mut root = serde_json::json!({ "other-group": { "PreInvocation": [] } });
-        merge_antigravity_hooks(&mut root, "/bin/kore-client");
-        merge_antigravity_hooks(&mut root, "/bin/kore-client"); // idempotent overwrite
+        merge_antigravity_hooks(&mut root, "/bin/centaury");
+        merge_antigravity_hooks(&mut root, "/bin/centaury"); // idempotent overwrite
 
         assert!(root["other-group"].is_object(), "foreign groups survive");
         let kl = &root["kore-lifecycle"];
         assert_eq!(kl["PreInvocation"].as_array().unwrap().len(), 2);
         assert_eq!(
             kl["PreInvocation"][0]["command"],
-            "/bin/kore-client hook antigravity sessionstart"
+            "/bin/centaury hook antigravity sessionstart"
         );
         assert_eq!(
             kl["PreInvocation"][1]["command"],
-            "/bin/kore-client hook antigravity beforeagent"
+            "/bin/centaury hook antigravity beforeagent"
         );
         assert_eq!(
             kl["PostInvocation"][0]["command"],
-            "/bin/kore-client hook antigravity afteragent"
+            "/bin/centaury hook antigravity afteragent"
         );
         assert_eq!(kl["PostInvocation"][0]["timeout"], 86400); // blocking wait
         assert_eq!(kl["PreInvocation"][0]["type"], "command");
@@ -3278,11 +3278,11 @@ mod tests {
             allow.iter().any(|e| e == "command(ls)"),
             "user rule survives"
         );
-        assert!(allow.iter().any(|e| e == "command(kore-client send)"));
+        assert!(allow.iter().any(|e| e == "command(centaury send)"));
         assert_eq!(
             allow
                 .iter()
-                .filter(|e| *e == "command(kore-client send)")
+                .filter(|e| *e == "command(centaury send)")
                 .count(),
             1,
             "no duplicate on re-install"
@@ -3325,7 +3325,7 @@ mod tests {
 
     /// The cline wrapper script must emit valid JSON with the hook output
     /// (quotes, backslashes, newlines) correctly escaped — run the real
-    /// script under sh with a fake kore-client on PATH (B2's trick).
+    /// script under sh with a fake centaury on PATH (B2's trick).
     #[test]
     #[cfg(unix)]
     fn cline_script_escapes_hook_output_into_json() {
@@ -3333,8 +3333,8 @@ mod tests {
         let base = std::env::temp_dir().join(format!("kore-cline-test-{}", std::process::id()));
         std::fs::create_dir_all(&base).unwrap();
 
-        // fake kore-client: multiline output with JSON-hostile characters
-        let fake = base.join("kore-client");
+        // fake centaury: multiline output with JSON-hostile characters
+        let fake = base.join("centaury");
         std::fs::write(
             &fake,
             "#!/bin/sh\nprintf 'say \"hi\" to C:\\\\path\\nline two\\n'\n",
@@ -3346,7 +3346,7 @@ mod tests {
         std::fs::write(&script, cline_hook_script("session-start")).unwrap();
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        // base first so the fake kore-client shadows any real one; the rest
+        // base first so the fake centaury shadows any real one; the rest
         // of PATH stays for sh/awk.
         let path = format!(
             "{}:{}",
@@ -3430,11 +3430,11 @@ mod tests {
     #[test]
     fn codex_merge_wires_posttooluse() {
         let mut root = serde_json::json!({ "other": true });
-        merge_codex_hooks(&mut root, "/bin/kore-client").expect("merge");
+        merge_codex_hooks(&mut root, "/bin/centaury").expect("merge");
         assert_eq!(root["other"], true, "foreign keys survive");
         for event in ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"] {
             assert_eq!(
-                root["hooks"][event][0]["hooks"][0]["command"], "/bin/kore-client hook codex",
+                root["hooks"][event][0]["hooks"][0]["command"], "/bin/centaury hook codex",
                 "{event} missing"
             );
         }
@@ -3445,19 +3445,19 @@ mod tests {
     #[test]
     fn hermes_config_merge_round_trips() {
         let original = "model: claude\n# user comment\nhooks_auto_accept: false\n";
-        let merged = hermes_merge_config(original, "/bin/kore-client").unwrap();
+        let merged = hermes_merge_config(original, "/bin/centaury").unwrap();
         assert!(merged.contains("# user comment"), "user comments survive");
-        assert!(merged.contains("\"/bin/kore-client hook hermes\""));
+        assert!(merged.contains("\"/bin/centaury hook hermes\""));
         for (event, timeout) in HERMES_HOOK_EVENTS {
             assert!(merged.contains(&format!("  {event}:")), "{event} missing");
             assert!(merged.contains(&format!("timeout: {timeout}")));
         }
 
         // Idempotent re-merge with a moved exe: one region, updated path.
-        let remerged = hermes_merge_config(&merged, "/moved/kore-client").unwrap();
+        let remerged = hermes_merge_config(&merged, "/moved/centaury").unwrap();
         assert_eq!(remerged.matches(HERMES_MARK_BEGIN_PREFIX).count(), 1);
-        assert!(remerged.contains("/moved/kore-client hook hermes"));
-        assert!(!remerged.contains("/bin/kore-client"));
+        assert!(remerged.contains("/moved/centaury hook hermes"));
+        assert!(!remerged.contains("/bin/centaury"));
 
         let stripped = hermes_strip_config(&remerged);
         assert_eq!(
@@ -3471,7 +3471,7 @@ mod tests {
     fn hermes_merge_swaps_empty_hooks_and_refuses_foreign() {
         // The shipped default `hooks: {}` is swapped in place, not duplicated.
         let cfg = "a: 1\nhooks: {}\nb: 2\n";
-        let merged = hermes_merge_config(cfg, "/bin/kore-client").unwrap();
+        let merged = hermes_merge_config(cfg, "/bin/centaury").unwrap();
         assert_eq!(
             merged.matches("\nhooks:").count() + usize::from(merged.starts_with("hooks:")),
             1,
@@ -3482,7 +3482,7 @@ mod tests {
         // A real user hooks block is never rewritten — the Err carries the
         // paste-ready YAML instead.
         let foreign = "hooks:\n  pre_tool_call:\n  - command: \"my-guard\"\n";
-        let err = hermes_merge_config(foreign, "/bin/kore-client").unwrap_err();
+        let err = hermes_merge_config(foreign, "/bin/centaury").unwrap_err();
         assert!(
             err.to_string().contains("hook hermes"),
             "error must carry the YAML"

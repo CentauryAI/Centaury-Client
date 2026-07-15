@@ -348,7 +348,7 @@ impl LaunchForm {
         }
     }
 
-    /// The detached `kore-client launch ...` argv this form describes.
+    /// The detached `centaury launch ...` argv this form describes.
     fn argv(&self) -> Vec<String> {
         let mut v = vec![
             "launch".to_string(),
@@ -428,7 +428,7 @@ async fn login_wizard() -> anyhow::Result<()> {
     if config::load_session().is_err() {
         let email = prompt_line("email: ")?;
         crate::commands::auth::login(email).await.map_err(|e| {
-            anyhow::anyhow!("{e}\nno account? run: kore-client signup <email> --name <You>")
+            anyhow::anyhow!("{e}\nno account? run: centaury signup <email> --name <You>")
         })?;
     }
     let session = config::load_session()?;
@@ -1123,12 +1123,12 @@ fn handle_form_key(code: KeyCode, form: &mut LaunchForm, feed: &mut Vec<FeedLine
     false
 }
 
-/// Run `kore-client launch ...` for the form. Both --terminal and --headless
+/// Run `centaury launch ...` for the form. Both --terminal and --headless
 /// spawn-and-return, so a blocking .output() here is milliseconds.
 fn run_form_launch(form: &LaunchForm) -> String {
     let exe = std::env::current_exe()
         .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "kore-client".into());
+        .unwrap_or_else(|_| "centaury".into());
     match std::process::Command::new(exe).args(form.argv()).output() {
         Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
             .trim()
@@ -1174,12 +1174,12 @@ fn handle_slash(
     feed.push(FeedLine::Note(note));
 }
 
-/// Spawn `kore-client launch --terminal` detached — the TUI owns this screen,
+/// Spawn `centaury launch --terminal` detached — the TUI owns this screen,
 /// so new agents get their own window (same trick as the legacy TUI).
 fn launch_note(name: &str, project: Option<&str>) -> String {
     let exe = std::env::current_exe()
         .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "kore-client".into());
+        .unwrap_or_else(|_| "centaury".into());
     let mut cmd = std::process::Command::new(exe);
     cmd.args(["launch", "--name", name, "--terminal"]);
     if let Some(p) = project {

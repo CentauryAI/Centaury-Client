@@ -49,12 +49,12 @@ pub struct LaunchArgs {
     pub wait: Option<u64>,
     /// Assign a behavioral role, re-injected on a cadence:
     /// "<title>[:every=<N><msg|tok>]" (default every=20msg). The role must
-    /// already exist in the project (`kore-client role create`).
+    /// already exist in the project (`centaury role create`).
     #[arg(long)]
     pub role: Option<String>,
     /// Auto-reminded skill: "<name>[:every=<N><msg|tok>][:pointer|full]"
     /// (default every=15msg, pointer). Repeatable; each must exist in the
-    /// project (`kore-client skill create`).
+    /// project (`centaury skill create`).
     #[arg(long = "skill")]
     pub skills: Vec<String>,
     /// Extra args passed to the tool (after --)
@@ -65,7 +65,7 @@ pub struct LaunchArgs {
 /// First-turn bootstrap for tools launched without a prompt — hook-only
 /// delivery means an agent that never had a turn is DEAF (no Stop hook
 /// listening); this seeds the turn that enters the Stop-wait loop.
-const SEED_PROMPT: &str = "You just joined the kore network. Run `kore-client list` to see \
+const SEED_PROMPT: &str = "You just joined the kore network. Run `centaury list` to see \
                     who is online, then wait for kore messages or user instructions.";
 
 /// `fork`: new agent continuing the current directory's most recent session.
@@ -121,7 +121,7 @@ fn inject_workspace_trust(tool: &str, tool_args: &mut Vec<String>) {
 /// Claude parks untrusted workspaces behind an interactive trust dialog and —
 /// worse for headless — silently IGNORES `.claude/settings.json`
 /// `permissions.allow` there ("Ignoring N permissions.allow entries"), so a
-/// background agent can never run `kore-client send` and is effectively mute
+/// background agent can never run `centaury send` and is effectively mute
 /// (found live in the DU-C1 spike). Pre-grant trust the way the dialog would:
 /// `projects["<canonical cwd>"].hasTrustDialogAccepted = true` in claude's
 /// state file (`$CLAUDE_CONFIG_DIR/.claude.json`, default `~/.claude.json`).
@@ -218,11 +218,11 @@ fn seed_cursor_trust_marker() -> anyhow::Result<()> {
 }
 
 /// Claude only — gemini/codex can resume a session but not fork one into a
-/// new session id; use `kore-client resume` for them.
+/// new session id; use `centaury resume` for them.
 pub async fn run_fork(mut args: LaunchArgs) -> anyhow::Result<()> {
     if args.tool != "claude" {
         anyhow::bail!(
-            "fork supports claude only ({} can't fork sessions — use `kore-client resume`)",
+            "fork supports claude only ({} can't fork sessions — use `centaury resume`)",
             args.tool
         );
     }
@@ -261,7 +261,7 @@ pub async fn run(mut args: LaunchArgs) -> anyhow::Result<()> {
     }
     if args.owner.is_none() {
         anyhow::bail!(
-            "launch needs an owner — register yourself first (`kore-client human <you>`) or pass --owner"
+            "launch needs an owner — register yourself first (`centaury human <you>`) or pass --owner"
         );
     }
     // Names resolved HERE so pre-registration, env and any re-exec all agree.
@@ -330,7 +330,7 @@ async fn validate_role_skills(args: &LaunchArgs, project: Option<&str>) -> anyho
         {
             Ok(roles) if !roles.iter().any(|r| &r.title == title) => anyhow::bail!(
                 "role '{title}' not found in project '{project}' — create it first: \
-                 kore-client role create {title:?} --content \"...\""
+                 centaury role create {title:?} --content \"...\""
             ),
             Ok(_) => {}
             Err(e) => eprintln!(
@@ -355,7 +355,7 @@ async fn validate_role_skills(args: &LaunchArgs, project: Option<&str>) -> anyho
                 if !missing.is_empty() {
                     anyhow::bail!(
                         "skill(s) not found in project '{project}': {} — create with \
-                         kore-client skill create",
+                         centaury skill create",
                         missing.join(", ")
                     );
                 }
@@ -554,7 +554,7 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
             args.tool_args.push(SEED_PROMPT.into());
         } else {
             anyhow::bail!(
-                "headless {} needs a prompt: kore-client launch --headless -- -p '<task>' (or --stay for a persistent agent)",
+                "headless {} needs a prompt: centaury launch --headless -- -p '<task>' (or --stay for a persistent agent)",
                 args.tool
             );
         }
@@ -585,7 +585,7 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
 
     // HC5: folder-trust is a first-run gate — gemini/codex park on a "trust
     // this folder?" prompt and never start, fatal for --headless/--count.
-    // Running kore-client here IS the consent; pre-grant it. KORE_AUTO_TRUST=0
+    // Running centaury here IS the consent; pre-grant it. KORE_AUTO_TRUST=0
     // opts out (no config file in kore — env is the knob).
     inject_workspace_trust(&args.tool, &mut args.tool_args);
 
@@ -613,7 +613,7 @@ fn run_inner(mut args: LaunchArgs, names: &[String]) -> anyhow::Result<()> {
         )
     })?;
     // Terminal-window launches funnel through this path too (the re-exec'd
-    // inner `kore-client launch` wraps the tool), so the recorded pid is
+    // inner `centaury launch` wraps the tool), so the recorded pid is
     // always the real tool process, not the terminal emulator.
     write_pid(&name, &args, child.id());
     spawn_waker(&name, child.id(), &args);
@@ -718,7 +718,7 @@ fn set_kore_env(cmd: &mut Command, name: &str, args: &LaunchArgs) {
         cmd.env("KORE_HOOK_TIMEOUT", "86400");
     }
     // Explicit, not inherited-only: terminal spawns (tmux runs in the server's
-    // context) and the agent's own kore-client calls must hit the same server.
+    // context) and the agent's own centaury calls must hit the same server.
     cmd.env("KORE_SERVER_URL", crate::config::server_url());
     if let Some(project) = &args.project {
         cmd.env("KORE_PROJECT", project);
@@ -812,7 +812,7 @@ fn spawn_headless(name: &str, args: &LaunchArgs) -> anyhow::Result<()> {
 
 // ---- --terminal: open the agent in a new terminal window ----
 //
-// Re-execs `kore-client launch` (same flags, minus --terminal) inside the new
+// Re-execs `centaury launch` (same flags, minus --terminal) inside the new
 // window, so identity/env setup goes through the one normal path. Preset
 // subset ported from legacy/src/shared/terminal_presets.rs; Warp/Zellij/macOS
 // bundles return when someone asks (plan B1).
@@ -897,11 +897,11 @@ fn on_path(bin: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The `kore-client launch ...` argv to run inside the new window.
+/// The `centaury launch ...` argv to run inside the new window.
 fn inner_launch_argv(name: &str, args: &LaunchArgs) -> Vec<String> {
     let exe = std::env::current_exe()
         .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "kore-client".to_string());
+        .unwrap_or_else(|_| "centaury".to_string());
     let mut v = vec![
         exe,
         "launch".into(),
@@ -1046,7 +1046,7 @@ mod tests {
     #[test]
     fn terminal_argv_wraps_inner_command() {
         let inner = vec![
-            "kore-client".to_string(),
+            "centaury".to_string(),
             "launch".into(),
             "--name".into(),
             "luna".into(),
@@ -1063,7 +1063,7 @@ mod tests {
         assert_eq!(&wez[..3], &["wezterm", "start", "--"]);
 
         // tmux: named window, single shell string, spaces quoted
-        let spaced = vec!["kore-client".to_string(), "send".into(), "hi there".into()];
+        let spaced = vec!["centaury".to_string(), "send".into(), "hi there".into()];
         let tmux = terminal_argv("tmux", spaced, title).unwrap();
         assert_eq!(&tmux[..4], &["tmux", "new-window", "-n", title]);
         assert!(tmux.last().unwrap().ends_with("send 'hi there'"));

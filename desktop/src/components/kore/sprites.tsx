@@ -48,7 +48,7 @@ export type Tool = {
   grid?: Grid; // defaults to ROBOT
 };
 
-// The tool zoo — mirrors the 10 hook-dialect tools kore-client speaks to.
+// The tool zoo — mirrors the 10 hook-dialect tools centaury speaks to.
 export const TOOLS: Tool[] = [
   { id: "claude", label: "Claude", body: "#D97757", dark: "#A94F35", eye: "#FFE7CC" },
   { id: "codex", label: "Codex", body: "#10A37F", dark: "#0B6B52", eye: "#B6F3DE" },
