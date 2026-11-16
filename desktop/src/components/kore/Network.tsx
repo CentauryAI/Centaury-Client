@@ -45,7 +45,7 @@ function Pins() {
 function KoreNode() {
   return (
     <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary font-mono text-lg font-bold text-primary-foreground shadow-lg">
-      K<Pins />
+      C<Pins />
     </div>
   );
 }

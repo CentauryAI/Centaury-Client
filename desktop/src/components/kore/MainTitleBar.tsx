@@ -10,7 +10,7 @@ async function openAbout() {
   if (existing) return void existing.setFocus();
   new WebviewWindow("about", {
     url: "/?window=about",
-    title: "About Kore",
+    title: "About Centaury",
     width: 340,
     height: 320,
     resizable: false,
@@ -25,7 +25,7 @@ export function MainTitleBar() {
   const { theme, setTheme } = useTheme();
   return (
     <TitleBar
-      title="Kore"
+      title="Centaury"
       rightActions={
         <>
           <button onClick={openAbout} className="title-bar-btn mr-1" aria-label="About / updates" tabIndex={-1}>

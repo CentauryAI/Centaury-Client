@@ -63,7 +63,7 @@ export const mockOrg = {
   people: ["mara", "leo", "sol", "ada", "nate", "iris", "kai", "rune", "vera", "tom"],
   totalPeople: 54,
   projects: <OrgProject[]>[
-    { name: "Kore Platform", agents: 24, people: ["mara", "leo", "sol", "ada", "nate", "iris"], totalPeople: 50, featured: true },
+    { name: "Centaury Platform", agents: 24, people: ["mara", "leo", "sol", "ada", "nate", "iris"], totalPeople: 50, featured: true },
     { name: "Research", agents: 8, people: ["iris", "kai"], totalPeople: 6 },
     { name: "Ops", agents: 5, people: ["vera"], totalPeople: 3 },
     { name: "Web", agents: 11, people: ["tom", "rune", "leo"], totalPeople: 9 },

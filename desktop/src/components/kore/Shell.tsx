@@ -19,7 +19,7 @@ const NAV: { id: View; icon: typeof HomeIcon; label: string }[] = [
 
 const KORE_ART = ` @--@--@
   |  |  |
- [==Kore==]`;
+ [Centaury]`;
 
 export function Shell({ onLogout }: { onLogout: () => void }) {
   const [view, setView] = useState<View>("home");
@@ -39,8 +39,8 @@ export function Shell({ onLogout }: { onLogout: () => void }) {
         <aside className="flex w-60 shrink-0 flex-col gap-3 border-r bg-muted/40 p-3">
           {/* brand */}
           <div className="flex items-center gap-2 px-2 pt-1">
-            <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">K</div>
-            <span className="k-title text-lg">Kore</span>
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">C</div>
+            <span className="k-title text-lg">Centaury</span>
           </div>
 
           {/* user card */}

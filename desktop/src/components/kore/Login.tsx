@@ -82,8 +82,8 @@ export function Login({ onReady }: { onReady: () => void }) {
       <motion.div className="relative z-10" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <Card className="w-[380px] border-border/60 bg-background/80 shadow-xl backdrop-blur-xl">
           <CardHeader>
-            <GradientHeading size="xxl" weight="bold">
-              Kore
+            <GradientHeading size="xl" weight="bold">
+              Centaury
             </GradientHeading>
             <CardDescription>
               {step === "login" ? "Sign in to your org" : "Join a project — you become an instance"}
