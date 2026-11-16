@@ -2,9 +2,12 @@
 #   1. Build centaury (centaury binary) for every supported target
 #      (linux musl static, macOS arm64/x86_64, windows x86_64)
 #   2. Create a GitHub Release with the compiled binaries
+#   3. Build + sign the desktop app (Tauri) for linux/macOS arm64+x86_64/windows,
+#      attach installers + updater bundles + latest.json to the same release
+#      and publish latest.json as desktop/latest.json on main (updater endpoint)
 #
-# `workflow_dispatch` = dry-run build: compiles all targets, skips the
-# release step — use it to verify the matrix before tagging.
+# `workflow_dispatch` = dry-run build: compiles all targets (CLI + desktop),
+# skips the release/publish steps — use it to verify the matrix before tagging.
 #
 # One-time manual setup:
 #   - Ensure the repo has the RELEASE_TOKEN secret if you want to publish

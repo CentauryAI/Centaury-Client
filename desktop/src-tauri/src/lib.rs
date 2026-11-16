@@ -185,9 +185,32 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                use tauri_plugin_updater::UpdaterExt;
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.handle().plugin(tauri_plugin_process::init())?;
+                // Startup probe, log only: a missing endpoint (404), no network
+                // or a malformed latest.json is logged and swallowed — never
+                // blocks or crashes the app. Install stays user-driven (About).
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let res = match handle
+                        .updater_builder()
+                        .timeout(std::time::Duration::from_secs(15))
+                        .build()
+                    {
+                        Ok(u) => u.check().await,
+                        Err(e) => Err(e),
+                    };
+                    match res {
+                        Ok(Some(u)) => eprintln!(
+                            "[updater] update available: {} -> {}",
+                            u.current_version, u.version
+                        ),
+                        Ok(None) => eprintln!("[updater] up to date"),
+                        Err(e) => eprintln!("[updater] could not check for updates: {e}"),
+                    }
+                });
             }
             Ok(())
         })

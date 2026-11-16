@@ -8,13 +8,15 @@ import { TitleBar } from "@/components/kore/TitleBar";
 import { Button } from "@/components/ui/button";
 
 type Phase = "idle" | "checking" | "latest" | "available" | "installing" | "ready" | "error";
+// Bounded so a dead/slow endpoint can't leave the button spinning forever.
+const CHECK_TIMEOUT_MS = 15_000;
 
 export function About() {
   const [version, setVersion] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [update, setUpdate] = useState<Update | null>(null);
   const [progress, setProgress] = useState(0); // 0..1; stays 0 if server omits content-length
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ msg: string; detail: string } | null>(null);
 
   useEffect(() => {
     void getVersion().then(setVersion);
@@ -22,15 +24,18 @@ export function About() {
 
   // C5: real updater (stub swap owner-approved 2026-07-06). Endpoint + pubkey
   // live in tauri.conf.json; artifacts signed with the kore-updater key.
+  // Missing endpoint (404), network down or malformed latest.json all reject
+  // here → friendly message, button re-enabled for a retry.
   async function checkUpdate() {
     setPhase("checking");
-    setError("");
+    setError(null);
     try {
-      const u = await check();
+      const u = await check({ timeout: CHECK_TIMEOUT_MS });
       setUpdate(u);
       setPhase(u ? "available" : "latest");
     } catch (e) {
-      setError(String(e));
+      console.warn("update check failed:", e);
+      setError({ msg: "Couldn't check for updates. Try again later.", detail: String(e) });
       setPhase("error");
     }
   }
@@ -51,7 +56,8 @@ export function About() {
       });
       setPhase("ready");
     } catch (e) {
-      setError(String(e));
+      console.warn("update install failed:", e);
+      setError({ msg: "Couldn't install the update.", detail: String(e) });
       setPhase("error");
     }
   }
@@ -63,9 +69,9 @@ export function About() {
         <main className="flex flex-1 flex-col items-center justify-center gap-5 p-6">
           <div className="text-center">
             <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-              K
+              C
             </div>
-            <h2 className="text-xl font-bold">Kore</h2>
+            <h2 className="text-xl font-bold">Centaury</h2>
             <p className="text-sm text-muted-foreground">Version {version || "…"}</p>
           </div>
 
@@ -121,8 +127,11 @@ export function About() {
             </div>
           )}
 
-          {phase === "error" && (
-            <p className="max-w-72 break-words text-center text-sm text-destructive">{error}</p>
+          {phase === "error" && error && (
+            <div className="max-w-72 text-center">
+              <p className="text-sm text-destructive">{error.msg}</p>
+              <p className="mt-1 break-words text-xs text-muted-foreground">{error.detail}</p>
+            </div>
           )}
         </main>
       </div>
