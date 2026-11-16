@@ -153,7 +153,7 @@ export function Login({ onReady }: { onReady: () => void }) {
                   <Separator className="flex-1" /> o <Separator className="flex-1" />
                 </div>
                 <Button type="button" variant="outline" className="w-full" onClick={enterDemo}>
-                  <PlayCircle className="mr-2 h-4 w-4" /> Probar en modo demo (sin servidor)
+                  <PlayCircle className="mr-2 h-4 w-4" /> Try demo mode (no server)
                 </Button>
               </>
             )}

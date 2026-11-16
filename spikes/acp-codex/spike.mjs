@@ -10,7 +10,7 @@ import readline from "node:readline";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agentCmd = process.env.ACP_AGENT ?? join(here, "node_modules/.bin/codex-acp");
-const prompt = process.argv[2] ?? "Responde solo: hola";
+const prompt = process.argv[2] ?? "Reply only: hello";
 const logDir = "/tmp/centaury-demo";
 mkdirSync(logDir, { recursive: true });
 const cwd = mkdtempSync(join(tmpdir(), "acp-spike-"));
@@ -91,7 +91,7 @@ try {
     prompt: [{ type: "text", text: prompt }],
   });
   console.log(`<- session/prompt stopReason=${res.stopReason}`);
-  console.log(`[texto completo] ${JSON.stringify(text)}`);
+  console.log(`[full text] ${JSON.stringify(text)}`);
 } catch (e) {
   console.log(`[error] ${e.message}`);
   process.exitCode = 1;

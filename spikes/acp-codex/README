@@ -1,5 +1,5 @@
-Spike ACP: cliente mínimo (Node, sin deps globales) que conduce codex vía el adaptador @agentclientprotocol/codex-acp.
-Instalar (local, sin -g):  cd Centaury-Client/spikes/acp-codex && npm install
-Ejecutar:                  node spike.mjs ["prompt"]   # por defecto «Responde solo: hola»; usa el login de ~/.codex
-Por defecto CODEX_PATH=~/.local/bin/codex y modo read-only; ACP_AGENT=/ruta/agente-acp para otro agente. Stderr: /tmp/centaury-demo/acp-codex-stderr.log
-Contexto y resultado: ../../ACP.md
+ACP spike: minimal client (Node, no global deps) that drives codex through the @agentclientprotocol/codex-acp adapter.
+Install (local, no -g):  cd Centaury-Client/spikes/acp-codex && npm install
+Run:                     node spike.mjs ["prompt"]   # default "Reply only: hello"; uses the ~/.codex login
+Defaults: CODEX_PATH=~/.local/bin/codex and read-only mode; ACP_AGENT=/path/to/acp-agent for another agent. Stderr: /tmp/centaury-demo/acp-codex-stderr.log
+Context and results: ../../ACP.md
