@@ -1,173 +1,194 @@
-// Home — org landing, dashboard-style (Centaury /client language). Live mode
-// (DU-D3): real projects from GET /v1/user/projects (name + instance_count) +
-// org name from login. Stats/bar are REAL counts (no fabricated finance). The
-// org-people strip needs GET /v1/org/members (DU-S4, not built) so it only
-// renders in demo. Demo mode keeps the full mockOrg preview.
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
-import { ArrowUpRight, Cpu, FolderGit2, Users } from "lucide-react";
-import { api, store, type ProjectSummary } from "@/lib/api";
-import { mockOrg } from "@/lib/mock";
-import { AvatarStack } from "@/components/kore/AvatarStack";
+// Home answers "where do I continue?": the active project first (its agents + one
+// button to open it), the other projects below as plain cards, and at most one row
+// of figures — every one of them real (/v1/user/projects, /v1/org/members,
+// /v1/org/agents, agents/max_agents from /v1/user/me). Demo runs the same path on mocks.
+import { useCallback, useEffect, useState } from "react";
+import { ArrowUpRight, Folder, Loader2, X } from "lucide-react";
+import { QueryState } from "@/components/kore/QueryState";
+import { Button, Eyebrow, PanelHeader, StatusDot } from "@/components/centaury";
+import { api, errorInfo, store, type ErrorKind, type OrgAgent, type ProjectSummary } from "@/lib/api";
+import { ago } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
-type Card = {
-  name: string;
-  featured: boolean;
-  count: number;
-  stat: string;
-  people?: string[]; // demo only — no org-members endpoint yet (DU-S4)
-  totalPeople?: number;
+type Fail = { kind: ErrorKind; message: string };
+type Data = {
+  projects: ProjectSummary[];
+  members: number | null;
+  agents: { used: number; max: number } | null;
+  roster: OrgAgent[] | null; // null = could not load (shown, not hidden)
 };
 
-function ProjectCard({ p, i, onOpen }: { p: Card; i: number; onOpen: (name: string) => void }) {
+function Figure({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <motion.button
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: i * 0.05 }}
-      onClick={() => onOpen(p.name)}
-      className={cnCard(p.featured)}
-    >
-      <div className="flex h-full flex-col p-5 text-left">
-        <div className="flex items-start justify-between">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-            <FolderGit2 className="h-4 w-4" />
-          </div>
-          <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-        </div>
-        <div className="flex-1" />
-        <h3 className={p.featured ? "k-title text-2xl" : "k-title text-base"}>{p.name}</h3>
-        <div className="mt-1 flex items-center gap-3 text-xs font-medium text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><Cpu className="h-3.5 w-3.5" /> {p.stat}</span>
-        </div>
-        {p.people && (
-          <div className="mt-3 flex items-center justify-between">
-            <AvatarStack seeds={p.people} total={p.totalPeople ?? p.people.length} max={p.featured ? 6 : 3} size={p.featured ? 32 : 26} />
-            {p.featured && <span className="text-[11px] text-muted-foreground">working here</span>}
-          </div>
-        )}
-      </div>
-    </motion.button>
-  );
-}
-
-function cnCard(featured?: boolean) {
-  return [
-    "group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md",
-    featured ? "col-span-2 row-span-2 min-h-[300px]" : "min-h-[144px]",
-  ].join(" ");
-}
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col justify-center rounded-xl bg-card p-4">
-      <span className="k-title text-2xl">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="min-w-0 rounded-2xl border border-border bg-card p-4">
+      <Eyebrow>{label}</Eyebrow>
+      <p className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+      {detail && <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>}
     </div>
   );
 }
 
-// per-project bar of instance counts — real data, /client bar look (dark cap +
-// slate-blue gradient body). Slate rgba = brand #777fa8, reads in both themes.
-function ProjectBars({ cards }: { cards: Card[] }) {
-  const max = Math.max(1, ...cards.map((c) => c.count));
-  return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <h2 className="k-title text-base">Instances per project</h2>
-      <div className="mt-5 flex h-[150px] items-end gap-2">
-        {cards.map((c) => (
-          <div key={c.name} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
-            <div className="flex w-full flex-col justify-end" style={{ height: `${(c.count / max) * 100}%`, minHeight: 4 }}>
-              <span className="h-[4px] rounded-t-sm bg-foreground/80" />
-              <span
-                className="flex-1 rounded-b-sm"
-                style={{ background: "linear-gradient(180deg, rgba(119,127,168,0.5) 0%, rgba(119,127,168,0.05) 100%)" }}
-              />
-            </div>
-            <span className="w-full truncate text-center text-[10px] text-muted-foreground">{c.name}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+export type OpenError = { project: string; kind: ErrorKind; message: string };
 
-export function Home({ onOpenProject }: { onOpenProject: (name: string) => void }) {
-  const [live, setLive] = useState<ProjectSummary[] | null>(null);
+export function Home({ onOpenProject, opening, openError, onDismissError, onLogin }: {
+  onOpenProject: (name: string) => void;
+  opening?: string | null;
+  openError?: OpenError | null;
+  onDismissError?: () => void;
+  onLogin?: () => void;
+}) {
+  const [data, setData] = useState<Data | null>(null);
+  const [err, setErr] = useState<Fail | null>(null);
 
-  useEffect(() => {
-    if (store.demo || !store.session) return;
-    api.userProjects(store.session).then(setLive).catch(() => {});
+  const load = useCallback(() => {
+    const session = store.session ?? "";
+    if (!store.demo && !session) return;
+    setErr(null);
+    setData(null);
+    // projects are the page; the rest only adds figures, so its failure degrades that piece
+    Promise.all([
+      api.userProjects(session),
+      api.orgMembers(session).then((m) => m.length).catch(() => null),
+      api.me(session).then((me) => (me.agents != null && me.max_agents != null ? { used: me.agents, max: me.max_agents } : null)).catch(() => null),
+      api.orgAgents(session).catch(() => null),
+    ])
+      .then(([projects, members, agents, roster]) => setData({ projects, members, agents, roster }))
+      .catch((e) => setErr(errorInfo(e)));
   }, []);
+  useEffect(load, [load]);
 
-  const demo = store.demo;
-  const orgName = demo ? mockOrg.name : store.org ?? "your org";
-  const cards: Card[] = demo
-    ? mockOrg.projects.map((p) => ({
-        name: p.name,
-        featured: !!p.featured,
-        count: p.agents,
-        stat: `${p.agents} agents`,
-        people: p.people,
-        totalPeople: p.totalPeople,
-      }))
-    : (live ?? []).map((p, i) => ({
-        name: p.name,
-        featured: i === 0,
-        count: p.instance_count,
-        stat: `${p.instance_count} instances`,
-      }));
-
-  const totalInstances = cards.reduce((s, c) => s + c.count, 0);
+  const forbidden = openError?.kind === "forbidden";
+  const projects = data?.projects ?? [];
+  const current = projects.find((p) => p.name === store.project) ?? projects[0];
+  const others = projects.filter((p) => p !== current);
+  const agentsHere = (data?.roster ?? []).filter((a) => a.project === current?.name);
+  const figures = data
+    ? [
+        { label: "Projects", value: String(projects.length) },
+        data.members != null && { label: "Members", value: String(data.members) },
+        data.agents && { label: "Agents", value: String(data.agents.used), detail: `of ${data.agents.max} allowed` },
+      ].filter((f): f is { label: string; value: string; detail?: string } => !!f)
+    : [];
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-6">
-      {/* top bar */}
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Organization</p>
-          <h1 className="k-title text-3xl">{orgName}</h1>
-        </div>
-        {demo && (
-          <span className="rounded-full border border-dashed px-3 py-1 font-mono text-[10px] uppercase text-muted-foreground">preview</span>
-        )}
-      </header>
+    <div className="@container h-full min-w-0 overflow-y-auto">
+      <div className="flex min-w-0 flex-col gap-5 p-2">
+        <header className="flex min-h-8 items-center">
+          <h1 className="text-ink font-heading text-lg font-semibold tracking-tight">Home</h1>
+        </header>
 
-      {/* stats / chart well — real Kore data, /client charts-panel language */}
-      <div className="grid gap-5 rounded-2xl bg-muted p-5 md:grid-cols-[1.25fr_1fr]">
-        <ProjectBars cards={cards} />
-        <div className="grid grid-cols-2 gap-3">
-          <StatTile label="Projects" value={String(cards.length)} />
-          <StatTile label="Instances" value={String(totalInstances)} />
-          <StatTile label="People" value={demo ? String(mockOrg.totalPeople) : "—"} />
-          {demo && (
-            <div className="col-span-1 flex items-center rounded-xl bg-card p-4">
-              <AvatarStack seeds={mockOrg.people} total={mockOrg.totalPeople} max={5} size={30} />
+        {openError && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {forbidden ? `You don't belong to “${openError.project}”` : `Couldn't open “${openError.project}”`}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {forbidden ? "Ask an organization admin to add you to this project." : openError.message}
+              </p>
+              {openError.kind === "auth" && onLogin && (
+                <button type="button" onClick={onLogin} className="mt-2 text-xs font-medium text-primary underline">Sign in again</button>
+              )}
+              {!forbidden && openError.kind !== "auth" && (
+                <button type="button" onClick={() => onOpenProject(openError.project)} className="mt-2 text-xs font-medium text-primary underline">Retry</button>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+            <button type="button" aria-label="Dismiss" onClick={onDismissError} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
-      {/* projects bento */}
-      <section className="k-card p-5">
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Projects</h2>
-        {!demo && cards.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No projects yet — open one by joining it at login, or summon an agent into a new one.
-          </p>
+        {!data ? (
+          <QueryState
+            state={err ? "error" : "loading"}
+            message={err ? err.message : "Loading projects…"}
+            kind={err?.kind}
+            onRetry={load}
+            onLogin={onLogin}
+          />
+        ) : projects.length === 0 ? (
+          <QueryState state="empty" message="No projects yet. Ask an organization admin to add you to one." />
+        ) : (
+          <>
+            {figures.length > 0 && (
+              <div className="grid gap-3 @md:grid-cols-3">
+                {figures.map((f) => <Figure key={f.label} {...f} />)}
+              </div>
+            )}
+
+            <section aria-label={`Continue in ${current.name}`} className="rounded-2xl border border-border bg-card p-5">
+              <Eyebrow>Continue in {current.name}</Eyebrow>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate font-heading text-2xl font-semibold tracking-tight">{current.name}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {current.instance_count} {current.instance_count === 1 ? "instance" : "instances"}
+                  </p>
+                </div>
+                <Button onClick={() => onOpenProject(current.name)} disabled={!!opening} aria-busy={opening === current.name}>
+                  {opening === current.name ? <Loader2 className="animate-spin" /> : <ArrowUpRight />} Open project
+                </Button>
+              </div>
+              <div className="mt-4 border-t border-border/70 pt-3">
+                {data.roster === null ? (
+                  <p className="text-sm text-muted-foreground">Couldn't load the agents of this project.</p>
+                ) : agentsHere.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No agents have joined this project yet.</p>
+                ) : (
+                  <ul className="grid gap-x-6 gap-y-2 @lg:grid-cols-2">
+                    {agentsHere.slice(0, 6).map((a) => (
+                      <li key={a.id} className="flex min-w-0 items-center justify-between gap-3 text-sm">
+                        <StatusDot tone={a.status === "active" ? "ok" : "idle"}>
+                          <span className="truncate font-medium">{a.name}</span>
+                        </StatusDot>
+                        <span className="shrink-0 text-xs text-muted-foreground">{ago(a.last_seen)}</span>
+                      </li>
+                    ))}
+                    {agentsHere.length > 6 && (
+                      <li className="text-xs text-muted-foreground">+{agentsHere.length - 6} more</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            {others.length > 0 && (
+              <section>
+                <PanelHeader title="Other projects" />
+                <div className="mt-3 grid gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
+                  {others.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      disabled={!!opening}
+                      aria-busy={opening === p.name}
+                      onClick={() => onOpenProject(p.name)}
+                      className={cn(
+                        "group flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary",
+                        opening && opening !== p.name && "opacity-60",
+                      )}
+                    >
+                      <Folder size={16} className="shrink-0 text-primary" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-heading text-base font-semibold tracking-tight">{p.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {p.instance_count} {p.instance_count === 1 ? "instance" : "instances"}
+                        </span>
+                      </span>
+                      {opening === p.name ? (
+                        <Loader2 size={14} className="shrink-0 animate-spin" />
+                      ) : (
+                        <ArrowUpRight size={14} className="shrink-0 text-muted-foreground group-hover:text-foreground" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
-        <div className="grid auto-rows-[144px] grid-cols-2 gap-4 lg:grid-cols-4">
-          {cards.map((p, i) => (
-            <ProjectCard key={p.name} p={p} i={i} onOpen={onOpenProject} />
-          ))}
-        </div>
-        {!demo && (
-          <p className="mt-4 text-[11px] text-muted-foreground">
-            <Users className="mr-1 inline h-3 w-3" />
-            Org member list arrives with the org-members endpoint (DU-S4).
-          </p>
-        )}
-      </section>
+      </div>
     </div>
   );
 }

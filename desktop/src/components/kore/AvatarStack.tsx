@@ -1,5 +1,5 @@
 // Overlapping circular avatars + "+N" overflow chip. Reuses the generative
-// per-seed AgentAvatar (smoothui) — colorful circles, no image assets.
+// per-seed AgentAvatar (smoothui) without image assets.
 import AgentAvatar from "@/components/smoothui/agent-avatar";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +24,7 @@ export function AvatarStack({
       {shown.map((s, i) => (
         <div
           key={s}
-          className="rounded-full ring-2 ring-background"
+          className="rounded-full ring-2 ring-card"
           style={{ marginLeft: i ? -overlap : 0, zIndex: max - i }}
         >
           <AgentAvatar seed={s} size={size} className="rounded-full" />
@@ -32,7 +32,7 @@ export function AvatarStack({
       ))}
       {extra > 0 && (
         <div
-          className="grid place-items-center rounded-full bg-muted font-medium text-muted-foreground ring-2 ring-background"
+          className="grid place-items-center rounded-full bg-secondary font-mono font-medium tabular-nums text-primary ring-2 ring-card"
           style={{ marginLeft: -overlap, width: size, height: size, fontSize: size * 0.32 }}
         >
           +{extra}

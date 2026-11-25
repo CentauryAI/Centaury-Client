@@ -1,0 +1,113 @@
+/* Marquee */
+@keyframes marquee-horizontal {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - var(--gap))); }
+}
+
+/* IntegrationsGrid — gentle per-tile bob on the tilted 3D plane (translateZ only, GPU-cheap) */
+@keyframes tile-float {
+  0%, 100% { transform: translateZ(0); }
+  50% { transform: translateZ(22px); }
+}
+
+/* Connector beams pulsing inward toward the Kore tile */
+@keyframes beam-pulse {
+  0% { opacity: 0; stroke-dashoffset: 0; }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; stroke-dashoffset: -40; }
+}
+
+/* Slow ambient gradient drift for a section backdrop */
+@keyframes gradient-shift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3%, 4%) scale(1.08); }
+}
+
+/* Aurora gradient blobs — GPU-cheap: transform + opacity only */
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(6%, -8%) scale(1.1); }
+  66% { transform: translate(-5%, 6%) scale(0.95); }
+}
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-8%, 5%) scale(1.08); }
+  75% { transform: translate(5%, -6%) scale(0.92); }
+}
+
+/* Animated dashed flow for SVG connection lines */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -64; }
+}
+
+/* Soft pulse for status dots */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Rotating conic border beam (BorderBeam) */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes border-spin {
+  to { --beam-angle: 360deg; }
+}
+
+/* Gradient sweep for shiny buttons/text */
+@keyframes shine-sweep {
+  to { background-position: -200% center; }
+}
+
+/* Terminal caret */
+@keyframes caret-blink {
+  50% { opacity: 0; }
+}
+
+/* Isometric scene motion — gentle, nothing crazy */
+@keyframes iso-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes diamond-drift {
+  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
+  50% { transform: translate(5px, -7px); opacity: 0.4; }
+}
+@keyframes ring-pulse {
+  0% { transform: scale(0.55); opacity: 0; }
+  25% { opacity: 0.55; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+
+/* Choreography: value swap in metric chips */
+@keyframes tick-in {
+  from { transform: translateY(5px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+/* Brief glow when a packet arrives */
+@keyframes arrive-flash {
+  0%, 55%, 100% { opacity: 0; }
+  70% { opacity: 0.7; }
+  85% { opacity: 0.15; }
+}
+/* Translucent iso planes sliding behind the hero object */
+@keyframes plane-slide {
+  0%, 100% { transform: translate(0, 0); opacity: 0.5; }
+  50% { transform: translate(10px, -6px); opacity: 0.85; }
+}
+/* Dashed selection box breathing around an object */
+@keyframes dash-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.06); opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

@@ -1,16 +1,17 @@
-import { Info, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Info } from "lucide-react";
+import { IconButton } from "@/components/centaury";
+import { ThemeToggle } from "@/lib/theme";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { TitleBar } from "@/components/kore/TitleBar";
 
 // Opens (or focuses) the About/updates child window. url stays same index.html;
 // main.tsx renders <About/> when ?window=about.
-async function openAbout() {
+export async function openAbout() {
   const existing = await WebviewWindow.getByLabel("about");
   if (existing) return void existing.setFocus();
   new WebviewWindow("about", {
     url: "/?window=about",
-    title: "About Kore",
+    title: "About Centaury",
     width: 340,
     height: 320,
     resizable: false,
@@ -22,23 +23,15 @@ async function openAbout() {
 }
 
 export function MainTitleBar() {
-  const { theme, setTheme } = useTheme();
   return (
     <TitleBar
-      title="Kore"
+      title="Centaury"
       rightActions={
         <>
-          <button onClick={openAbout} className="title-bar-btn mr-1" aria-label="About / updates" tabIndex={-1}>
-            <Info className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="title-bar-btn mr-0.5"
-            aria-label="Toggle theme"
-            tabIndex={-1}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          <IconButton onClick={openAbout} label="About / updates" tabIndex={-1}>
+            <Info size={16} />
+          </IconButton>
+          <ThemeToggle tabIndex={-1} />
         </>
       }
     />

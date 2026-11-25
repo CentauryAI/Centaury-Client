@@ -1,0 +1,52 @@
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: var(--font-heading);
+  }
+  /* No lone last word: headings balance their lines, running text avoids
+     orphans. */
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+  p, li, dt, dd, blockquote, figcaption {
+    text-wrap: pretty;
+  }
+}
+
+/* Gradient ink: solid at the top, a whisper of the brand color at the
+ * baseline. Headings only; .text-ink on light, .text-ink-dark on bands. */
+.text-ink {
+  background-image: linear-gradient(to bottom, var(--foreground) 45%, var(--primary) 140%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-ink-dark {
+  background-image: linear-gradient(to bottom, #ffffff 40%, var(--ink-dark-to) 135%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Dark bands: a rounded slate block that floats inside a white section. */
+@utility band-radial {
+  background-image: radial-gradient(130% 100% at 50% 0%, var(--band-lit) 0%, var(--band) 48%, var(--band-deep) 100%);
+}
+@utility band-linear {
+  background-image: linear-gradient(180deg, #343748 0%, var(--band) 55%, #232532 100%);
+}
+
+/* Ground of the auth pages: blue-gray with a faint 56px grid. */
+@utility ground-grid {
+  background-color: var(--ground-auth);
+  background-image:
+    linear-gradient(to right, rgba(44, 46, 58, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(44, 46, 58, 0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+}

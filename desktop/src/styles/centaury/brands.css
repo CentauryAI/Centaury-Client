@@ -1,0 +1,80 @@
+/*
+ * Per-brand themes. Chosen with data-brand on <html> (or on any container):
+ *
+ *   <html data-brand="net">
+ *
+ * Changing a brand's palette = editing its block, nothing else. All
+ * components (charts and shaders included) read these variables.
+ *
+ *   --primary     brand color for text and buttons; ≥ 4.5:1 on white
+ *   --accent      the brand hue as is: charts, dots, halos, shaders
+ *   --glow-b/-c   secondary tints for halos and animated borders (never text)
+ *   --ink-dark-to foot of the .text-ink-dark gradient on dark bands
+ *   --chart-1…5   monochrome chart ramp (1 = main data)
+ *
+ * Brand colors are 6-digit hex: the shaders read them that way.
+ */
+
+/* CentauryAI — blue slate (the original style of web/) */
+:root,
+[data-brand="ai"] {
+  --primary: #626a8b; /* 5.31:1 */
+  --primary-foreground: #ffffff;
+  --ring: #626a8b;
+  --accent: #777fa8;
+  --accent-foreground: #ffffff;
+  --glow-b: #9a8fd0;
+  --glow-c: #8fb8d8;
+  --ink-dark-to: #959fbf;
+  --chart-1: #777fa8;
+  --chart-2: #abb6ce;
+  --chart-3: #595e7a;
+  --chart-4: #dae1eb;
+  --chart-5: #959fbf;
+  --sidebar-primary: #777fa8;
+  --sidebar-ring: #777fa8;
+}
+
+/* Centaury.net — petrol green on the same slate base.
+ * Tested alternatives (AA on white), to change only this block:
+ *   copper  --primary #96563a (5.69:1) · --accent #c08a6a · --ink-dark-to #d3a98f
+ *   moss    --primary #4d7052 (5.59:1) · --accent #7fa285 · --ink-dark-to #a9c4ad */
+[data-brand="net"] {
+  --primary: #2f6f6b; /* 5.82:1 */
+  --primary-foreground: #ffffff;
+  --ring: #2f6f6b;
+  --accent: #4f9a93;
+  --accent-foreground: #ffffff;
+  --glow-b: #7fb5a0;
+  --glow-c: #8fb8d8;
+  --ink-dark-to: #9fc3bf;
+  --chart-1: #4f9a93;
+  --chart-2: #a3cbc6;
+  --chart-3: #2f6f6b;
+  --chart-4: #d9e9e7;
+  --chart-5: #7fb5ae;
+  --sidebar-primary: #4f9a93;
+  --sidebar-ring: #4f9a93;
+}
+
+/* Centaury Studio — neutral: the accent is the ink itself */
+[data-brand="studio"] {
+  --primary: #41465e; /* 9.28:1 */
+  --primary-foreground: #ffffff;
+  /* #41465e on the dark bar was 1.3:1: the Contact pill disappeared */
+  --navbar-action: #ebeff4;
+  --navbar-action-foreground: #2c2e3a;
+  --ring: #41465e;
+  --accent: #595e7a;
+  --accent-foreground: #ffffff;
+  --glow-b: #8a90a2;
+  --glow-c: #b4bac7;
+  --ink-dark-to: #b4bac7;
+  --chart-1: #595e7a;
+  --chart-2: #b4bac7;
+  --chart-3: #2c2e3a;
+  --chart-4: #e9ebf1;
+  --chart-5: #8a90a2;
+  --sidebar-primary: #595e7a;
+  --sidebar-ring: #595e7a;
+}

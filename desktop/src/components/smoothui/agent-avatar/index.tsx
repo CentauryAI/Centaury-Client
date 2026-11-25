@@ -19,30 +19,41 @@ const GRID_SIZE = 6;
 
 /** Pulse: each pixel oscillates lightness independently */
 const PULSE_SPEED = 0.002;
-const PULSE_AMPLITUDE = 22;
+const PULSE_AMPLITUDE = 8;
 
 /** Breathe: global slow scale oscillation */
 const BREATHE_SPEED = 0.001;
-const BREATHE_AMPLITUDE = 10;
+const BREATHE_AMPLITUDE = 4;
 
 /** Wave: diagonal sweep across the grid */
 const WAVE_SPEED = 0.0015;
-const WAVE_AMPLITUDE = 15;
+const WAVE_AMPLITUDE = 6;
 const WAVE_LENGTH = 3;
 
 /** Sparkle: random bright flashes */
 const SPARKLE_SPEED = 0.004;
 const SPARKLE_THRESHOLD = 0.92;
-const SPARKLE_BOOST = 25;
+const SPARKLE_BOOST = 8;
 
 /** Scale pulse: whole avatar breathes in size */
 const SCALE_PULSE_SPEED = 0.0008;
 const SCALE_PULSE_AMOUNT = 0.03;
 
-/** Max hue spread from base — wider for richer color variation */
-const HUE_SPREAD = 45;
+const GLOW_RADIUS_RATIO = 0.2;
 
-const GLOW_RADIUS_RATIO = 0.25;
+// Slate/brand ramp — the only allowed colors per RULES.md §3.
+// No hue variation: all slots come from these hex values.
+const SLATE_RAMP = [
+  "#2c2e3a",
+  "#41465e",
+  "#595e7a",
+  "#6c7296",
+  "#777fa8",
+  "#959fbf",
+  "#abb6ce",
+  "#c9d1e0",
+  "#dfe6f5",
+] as const;
 
 /** Simple deterministic hash from a string */
 const hashSeed = (str: string): number => {
@@ -64,34 +75,44 @@ const createRng = (seed: number) => {
   };
 };
 
-type HSL = [hue: number, saturation: number, lightness: number];
-
-/** Derive a 3-color palette within the same hue family */
-const generatePalette = (hash: number): [HSL, HSL, HSL] => {
-  const rng = createRng(hash);
-  const baseHue = rng() * 360;
-  const sat = 75 + rng() * 20; // 75-95%
-
+/** Parse a hex color string to [r, g, b] numbers 0-255 */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
   return [
-    [baseHue, sat, 55 + rng() * 10],
-    [
-      (baseHue - HUE_SPREAD + rng() * HUE_SPREAD * 2) % 360,
-      sat - 5 + rng() * 10,
-      40 + rng() * 15,
-    ],
-    [
-      (baseHue - HUE_SPREAD + rng() * HUE_SPREAD * 2) % 360,
-      sat - 10 + rng() * 15,
-      60 + rng() * 15,
-    ],
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
   ];
-};
+}
 
-type Cell = {
-  colorIndex: number;
+/** Interpolate between two [r,g,b] colors by t in [0,1] */
+function lerpRgb(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number
+): [number, number, number] {
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t),
+  ];
+}
+
+type SlateColor = {
+  baseIdx: number;   // index into SLATE_RAMP
   phase: number;
   brightness: number;
   sparklePhase: number;
+};
+
+type Cell = SlateColor;
+
+/** Derive a 3-step palette within the slate ramp — anchored to seed */
+const generatePalette = (hash: number): [number, number, number] => {
+  const rng = createRng(hash);
+  // Three anchor indices spread across the ramp, seed-shifted
+  const base = Math.floor(rng() * (SLATE_RAMP.length - 4));
+  return [base, base + 2, base + 4] as [number, number, number];
 };
 
 /** Build a grid with per-cell metadata */
@@ -103,9 +124,9 @@ const generateGrid = (hash: number): Cell[][] => {
     grid[y] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
       grid[y][x] = {
-        colorIndex: Math.floor(rng() * 3),
+        baseIdx: Math.floor(rng() * 3), // picks one of the 3 palette slots
         phase: rng() * Math.PI * 2,
-        brightness: 0.3 + rng() * 0.7,
+        brightness: 0.6 + rng() * 0.4,
         sparklePhase: rng() * Math.PI * 2,
       };
     }
@@ -141,10 +162,17 @@ const AgentAvatar = ({
     ctx.scale(dpr, dpr);
 
     const hash = hashSeed(seed);
-    const palette = generatePalette(hash);
+    const paletteIdxs = generatePalette(hash);
     const grid = generateGrid(hash);
     const cellSize = size / GRID_SIZE;
     const half = size / 2;
+
+    // The 3 ramp colors this seed uses
+    const paletteColors = paletteIdxs.map((i) => hexToRgb(SLATE_RAMP[i])) as [
+      [number, number, number],
+      [number, number, number],
+      [number, number, number],
+    ];
 
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     let shouldAnimate = animated && !motionQuery.matches;
@@ -167,11 +195,12 @@ const AgentAvatar = ({
       ctx.arc(half, half, half, 0, Math.PI * 2);
       ctx.clip();
 
-      // Dark background
-      ctx.fillStyle = "#08080f";
+      // Dark background from the ramp
+      const [br, bg, bb] = hexToRgb(SLATE_RAMP[1]);
+      ctx.fillStyle = `rgb(${br},${bg},${bb})`;
       ctx.fillRect(0, 0, size, size);
 
-      // Global breathe offset for lightness
+      // Global breathe offset for blending
       const breatheOffset = shouldAnimate
         ? Math.sin(time * BREATHE_SPEED) * BREATHE_AMPLITUDE
         : 0;
@@ -180,9 +209,9 @@ const AgentAvatar = ({
       for (let y = 0; y < GRID_SIZE; y++) {
         for (let x = 0; x < GRID_SIZE; x++) {
           const cell = grid[y][x];
-          const [h, s, l] = palette[cell.colorIndex];
+          const baseRgb = paletteColors[cell.baseIdx];
 
-          // Per-pixel pulse
+          // Per-pixel pulse — slightly blends toward a lighter ramp step
           const pulse = shouldAnimate
             ? Math.sin(time * PULSE_SPEED + cell.phase) * PULSE_AMPLITUDE
             : 0;
@@ -193,7 +222,7 @@ const AgentAvatar = ({
             ? Math.sin(time * WAVE_SPEED + waveDist) * WAVE_AMPLITUDE
             : 0;
 
-          // Sparkle — occasional bright flash
+          // Sparkle — occasional lighter flash
           const sparkleVal = shouldAnimate
             ? Math.sin(time * SPARKLE_SPEED + cell.sparklePhase)
             : 0;
@@ -203,20 +232,22 @@ const AgentAvatar = ({
                 SPARKLE_BOOST
               : 0;
 
-          const finalLight = Math.min(
-            90,
-            Math.max(
-              20,
-              (l + pulse + breatheOffset + wave + sparkle) * cell.brightness
-            )
+          // Lightness-blend: combine offsets into a 0-1 lerp toward a lighter step
+          const rawT = ((pulse + breatheOffset + wave + sparkle) / 30 + 0.5) * cell.brightness;
+          const t = Math.max(0, Math.min(1, rawT));
+
+          // Blend between base color and one step lighter (capped at ramp end)
+          const nextIdx = Math.min(
+            paletteIdxs[cell.baseIdx] + 2,
+            SLATE_RAMP.length - 1
           );
-          const finalSat = Math.min(100, s + 5);
+          const nextRgb = hexToRgb(SLATE_RAMP[nextIdx]);
+          const [r, g, b] = lerpRgb(baseRgb, nextRgb, t);
 
-          // Pixel glow — subtle shadow per cell
-          ctx.shadowColor = `hsl(${h}, ${finalSat}%, ${finalLight}%)`;
-          ctx.shadowBlur = cellSize * 0.45;
+          ctx.shadowColor = `rgb(${r},${g},${b})`;
+          ctx.shadowBlur = cellSize * 0.35;
 
-          ctx.fillStyle = `hsl(${h}, ${finalSat}%, ${finalLight}%)`;
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
       }
@@ -225,15 +256,15 @@ const AgentAvatar = ({
       ctx.shadowBlur = 0;
       ctx.restore();
 
-      // Outer glow ring
-      const [gh, gs, gl] = palette[0];
+      // Outer ring from the lightest palette color
+      const [gr, gg, gb] = paletteColors[2];
       ctx.save();
       ctx.globalCompositeOperation = "screen";
-      ctx.shadowColor = `hsla(${gh}, ${gs}%, ${gl}%, 0.6)`;
+      ctx.shadowColor = `rgba(${gr},${gg},${gb},0.4)`;
       ctx.shadowBlur = size * GLOW_RADIUS_RATIO;
       ctx.beginPath();
       ctx.arc(half, half, half - 1, 0, Math.PI * 2);
-      ctx.strokeStyle = `hsla(${gh}, ${gs}%, ${gl}%, 0.15)`;
+      ctx.strokeStyle = `rgba(${gr},${gg},${gb},0.12)`;
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.restore();

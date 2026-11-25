@@ -15,6 +15,12 @@ export type OrgUsage = { agents: number; max_agents: number; humans: number; use
 export type ProjectMemberSummary = { user_id: string; display_name: string; owner_name: string };
 export type ProjectSummary = { name: string; instance_count: number };
 export type RegisterResponse = { token: string; name: string };
+export type SendResponse = { id: number; scope: string; mentions: string[] };
+// GET /v1/user/me (subset the app uses)
+export type UserMe = { email: string; display_name: string; role: string; org_name: string; plan?: string; agents?: number; max_agents?: number };
+// GET /v1/org/agents (admin = whole org, member = their projects) and GET /v1/org/audit (admin)
+export type OrgAgent = { id: string; name: string; project: string; role: string | null; status: string; last_seen: string | null; messages_sent: number };
+export type AuditEntry = { id: number; actor_kind: string; actor_label: string; action: string; target: string | null; ip: string | null; data: unknown; created_at: string };
 export type InstanceSummary = {
   name: string;
   tag: string | null;
@@ -39,6 +45,12 @@ export type Message = {
   bundle_id: string | null;
 };
 export type Delivery = { id: number } & Message;
+// GET /v1/org/projects/{name}/messages (SESSION token): carries created_at, lacks sender_kind/delivered_to/bundle_id
+export type OrgMessage = {
+  id: number; from: string; scope: string; mentions: string[]; text: string;
+  intent: string | null; thread: string | null; reply_to: number | null; created_at: string;
+};
+export type ThreadSummary = { name: string; message_count: number; last_msg_id: number };
 
 // ---- session state (localStorage; token files are the CLI's job) ----
 const K = {
@@ -49,7 +61,19 @@ const K = {
   name: "kore.name",
   org: "kore.org",
   demo: "kore.demo",
+  tokens: "kore.instance_tokens", // { [project]: { token, at } } — one instance token per project
 } as const;
+
+// instance tokens live 7 days server-side; refresh a bit earlier
+const TOKEN_MAX_AGE_MS = 6 * 24 * 3600 * 1000;
+type TokenMap = Record<string, { token: string; at: number }>;
+function readTokens(): TokenMap {
+  try {
+    return JSON.parse(localStorage.getItem(K.tokens) || "{}") as TokenMap;
+  } catch {
+    return {};
+  }
+}
 
 export const store = {
   get server() {
@@ -94,10 +118,48 @@ export const store = {
   set demo(v: boolean) {
     v ? localStorage.setItem(K.demo, "1") : localStorage.removeItem(K.demo);
   },
+  // the instance token for a specific project (null if none / stale)
+  tokenFor(project: string): string | null {
+    const t = readTokens()[project];
+    return t && Date.now() - t.at < TOKEN_MAX_AGE_MS ? t.token : null;
+  },
+  // remember a project's token and make it the active project
+  activate(project: string, token: string, name?: string) {
+    localStorage.setItem(K.tokens, JSON.stringify({ ...readTokens(), [project]: { token, at: Date.now() } }));
+    store.project = project;
+    store.token = token;
+    if (name) store.name = name;
+  },
   clear() {
-    [K.session, K.token, K.project, K.name, K.org, K.demo].forEach((k) => localStorage.removeItem(k));
+    [K.session, K.token, K.project, K.name, K.org, K.demo, K.tokens].forEach((k) => localStorage.removeItem(k));
   },
 };
+
+// ---- errors: one shape so every screen can tell 401/403/429/network/5xx apart ----
+export type ErrorKind = "auth" | "forbidden" | "rate" | "server" | "network" | "other";
+export class ApiError extends Error {
+  constructor(public status: number, public detail: string) {
+    super(`${status} ${detail}`.trim());
+  }
+}
+export function errorInfo(e: unknown): { kind: ErrorKind; message: string } {
+  if (e instanceof ApiError) {
+    const d = e.detail && e.detail.length < 160 ? ` (${e.detail})` : "";
+    if (e.status === 401) return { kind: "auth", message: "Your session expired. Sign in again." };
+    if (e.status === 403) return { kind: "forbidden", message: `You don't have permission for this${d}` };
+    if (e.status === 429) return { kind: "rate", message: "Too many requests. Wait a moment and retry." };
+    if (e.status >= 500) return { kind: "server", message: `The server had a problem (${e.status}). Retry in a moment.` };
+    return { kind: "other", message: e.detail || `Request failed (${e.status})` };
+  }
+  const m = e instanceof Error ? e.message : String(e);
+  return { kind: "network", message: `Can't reach the server (${m}). Check your connection.` };
+}
+
+// App registers this: a 401 on any authenticated call = session/token expired → back to login.
+let authExpiredHandler: (() => void) | null = null;
+export function onAuthExpired(fn: (() => void) | null) {
+  authExpiredHandler = fn;
+}
 
 async function req<T>(path: string, opts: { method?: string; body?: unknown; token?: string | null } = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -109,7 +171,8 @@ async function req<T>(path: string, opts: { method?: string; body?: unknown; tok
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${detail || res.statusText}`);
+    if (res.status === 401 && opts.token && !store.demo) authExpiredHandler?.();
+    throw new ApiError(res.status, detail || res.statusText);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
@@ -129,23 +192,40 @@ export const api = {
   // org directory (DU-S4): any member, session token — powers the owner picker
   orgMembers: (session: string) =>
     store.demo ? Promise.resolve(mock.mockMembers) : req<OrgMemberSummary[]>("/v1/org/members", { token: session }),
-  instances: () =>
-    store.demo ? Promise.resolve(mock.mockRoster) : req<InstanceSummary[]>("/v1/instances", { token: store.token }),
+  // role comes from here (admin | member), not from probing /v1/org/usage
+  me: (session: string) =>
+    store.demo
+      ? Promise.resolve<UserMe>({ email: "you@demo", display_name: "You", role: "member", org_name: mock.mockOrg.name, plan: "demo" })
+      : req<UserMe>("/v1/user/me", { token: session }),
+  orgAgents: (session: string) =>
+    store.demo ? Promise.resolve(mock.mockOrgAgents) : req<OrgAgent[]>("/v1/org/agents", { token: session }),
+  orgAudit: (session: string, limit = 50, before?: number) =>
+    req<AuditEntry[]>(`/v1/org/audit?limit=${limit}${before ? `&before=${before}` : ""}`, { token: session }),
+  // `token` overrides the active project's token (e.g. Network drilling into another joined project)
+  instances: (token: string | null = store.token) =>
+    store.demo ? Promise.resolve(mock.mockRoster) : req<InstanceSummary[]>("/v1/instances", { token }),
   history: (limit = 50, thread?: string) =>
     store.demo
-      ? Promise.resolve(mock.mockFeed)
+      ? Promise.resolve(thread ? mock.mockFeed.filter((m) => m.thread === thread) : mock.mockFeed)
       : req<Delivery[]>(`/v1/messages?limit=${limit}${thread ? `&thread=${encodeURIComponent(thread)}` : ""}`, {
           token: store.token,
         }),
   unread: () => (store.demo ? Promise.resolve({ count: 0 }) : req<{ count: number }>("/v1/messages/unread", { token: store.token })),
-  threads: () =>
-    store.demo ? Promise.resolve(mock.mockThreads) : req<{ name: string; message_count: number; last_msg_id: number }[]>("/v1/threads", { token: store.token }),
+  threads: () => (store.demo ? Promise.resolve<ThreadSummary[]>(mock.mockThreads) : req<ThreadSummary[]>("/v1/threads", { token: store.token })),
+  // timestamps + backwards paging (the only route that has either); needs the session token
+  orgMessages: (project: string, limit = 200, before?: number) =>
+    store.demo
+      ? Promise.resolve(mock.mockOrgMessages(limit, before))
+      : req<OrgMessage[]>(
+          `/v1/org/projects/${encodeURIComponent(project)}/messages?limit=${limit}${before ? `&before=${before}` : ""}`,
+          { token: store.session },
+        ),
 
   // send — in demo, no server; the caller echoes the local Delivery itself.
   send: (text: string, targets: string[] = [], reply_to?: number, thread?: string) =>
     store.demo
-      ? Promise.resolve({ id: mock.mockSend(text).id })
-      : req<{ id: number }>("/v1/messages", {
+      ? Promise.resolve<SendResponse>({ id: mock.mockSend(text, targets, reply_to, thread).id, scope: targets.length ? "mentions" : "broadcast", mentions: targets })
+      : req<SendResponse>("/v1/messages", {
           method: "POST",
           body: { text, targets, reply_to, thread },
           token: store.token,
@@ -180,21 +260,75 @@ export const api = {
 };
 
 // Live delivery. peek=true so the desktop never steals the identity's real
-// inbox (same rule the TUI follows). Returns a disconnect fn.
-export async function connectWs(onDelivery: (d: Delivery) => void, onClose?: () => void): Promise<() => void> {
-  if (store.demo) return () => {}; // no server in demo mode
+// inbox (same rule the TUI follows). Reconnects by itself with growing waits
+// (1s, 2s, 4s … capped at 30s, + jitter) and reports "connected"/"reconnecting"
+// through onState — peek has no replay, so callers re-fetch history on every
+// transition back to "connected". Returns a disconnect fn (stops reconnecting).
+export type WsState = "connecting" | "connected" | "reconnecting";
+export function connectWs(onDelivery: (d: Delivery) => void, onState?: (s: WsState) => void): () => void {
+  if (store.demo) {
+    onState?.("connected"); // no server in demo mode
+    return () => {};
+  }
   const wsUrl = store.server.replace(/^http/, "ws") + `/v1/ws?peek=true`;
-  const ws = await WebSocket.connect(wsUrl, { headers: { Authorization: `Bearer ${store.token}` } });
-  ws.addListener((msg) => {
-    if (msg.type === "Text") {
-      try {
-        onDelivery(JSON.parse(msg.data as string));
-      } catch {
-        /* non-JSON control frame */
-      }
-    } else if (msg.type === "Close") {
-      onClose?.();
+  const token = store.token; // pinned: a project switch must not retarget this socket
+  let stopped = false;
+  let attempt = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let ws: WebSocket | undefined;
+
+  const retry = () => {
+    if (stopped || timer) return;
+    onState?.("reconnecting");
+    const wait = Math.min(30_000, 1000 * 2 ** attempt) + Math.random() * 400;
+    attempt++;
+    timer = setTimeout(() => {
+      timer = undefined;
+      open();
+    }, wait);
+  };
+  const open = async () => {
+    if (stopped) return;
+    if (attempt === 0) onState?.("connecting");
+    let sock: WebSocket;
+    try {
+      // a connect that never settles must not stall reconnection forever: give up after 10s
+      const attemptP = WebSocket.connect(wsUrl, { headers: { Authorization: `Bearer ${token}` } });
+      attemptP.then((late) => { if (timedOut) late.disconnect().catch(() => {}); }, () => {});
+      let timedOut = false;
+      sock = await Promise.race([
+        attemptP,
+        new Promise<never>((_, rej) => setTimeout(() => { timedOut = true; rej(new Error("connect timeout")); }, 10_000)),
+      ]);
+    } catch (e) {
+      if (/\b401\b/.test(String(e)) && !stopped) authExpiredHandler?.();
+      retry();
+      return;
     }
-  });
-  return () => ws.disconnect();
+    if (stopped) {
+      sock.disconnect().catch(() => {});
+      return;
+    }
+    ws = sock;
+    attempt = 0;
+    onState?.("connected");
+    sock.addListener((msg) => {
+      if (msg.type === "Text") {
+        try {
+          onDelivery(JSON.parse(msg.data as string));
+        } catch {
+          /* non-JSON control frame */
+        }
+      } else if (msg.type === "Close") {
+        if (ws === sock) ws = undefined;
+        retry();
+      }
+    });
+  };
+  open();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    ws?.disconnect().catch(() => {});
+  };
 }

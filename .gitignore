@@ -18,3 +18,6 @@ desktop/src-tauri/binaries/
 .DS_Store
 Thumbs.db
 client/src/plugins/node_modules/
+
+# Local UI verification scripts and screenshots (also holds a private server reference copy)
+.playwright-mcp/

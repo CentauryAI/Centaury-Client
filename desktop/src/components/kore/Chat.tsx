@@ -24,7 +24,7 @@ export function Chat({ onLogout }: { onLogout: () => void }) {
     loadRoster();
     const iv = setInterval(loadRoster, 5000);
     let disconnect: (() => void) | undefined;
-    connectWs((d) => setFeed((f) => (f.some((m) => m.id === d.id) ? f : [...f, d]))).then((fn) => (disconnect = fn));
+    disconnect = connectWs((d) => setFeed((f) => (f.some((m) => m.id === d.id) ? f : [...f, d])));
     return () => {
       clearInterval(iv);
       disconnect?.();
@@ -73,7 +73,7 @@ export function Chat({ onLogout }: { onLogout: () => void }) {
               <button
                 key={i.name}
                 onClick={() => setText((t) => `${t}@${i.tag ? `${i.tag}-` : ""}${i.name} `)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
               >
                 <div className="relative shrink-0">
                   <AgentAvatar seed={i.name} size={26} animated={i.status === "active"} className="rounded-full" />

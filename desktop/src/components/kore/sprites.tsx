@@ -1,8 +1,9 @@
 // Hand-authored pixelart sprites — one robot per tool dialect, brand-tinted.
 // Pure inline SVG (crispEdges), zero deps, zero assets, theme-agnostic. Used by
-// Wire.tsx (the fleet visualization). Colors are decorative brand-evocations,
-// not official values. One shared 12x12 robot grid + a human grid; the tool's
-// palette (body/dark/eye) is what makes each node read distinct.
+// Wire.tsx (the fleet visualization). The website (web/src/components/agents/identity.tsx)
+// identifies agents by icon marks, not figurative robots. We follow a simplified mark
+// approach: same robot silhouette but restricted to the slate/brand ramp per RULES.md §6.
+// palette: each tool picks three values from the ramp so the workspace stays monochrome.
 // ponytail: single silhouette recolored per tool; give a tool its own grid here
 // if color alone stops being enough to tell them apart.
 
@@ -48,21 +49,23 @@ export type Tool = {
   grid?: Grid; // defaults to ROBOT
 };
 
-// The tool zoo — mirrors the 10 hook-dialect tools centaury speaks to.
+// Slate/brand ramp — the only allowed palette per RULES.md §3.
+// Each tool picks a distinct lightness step so they stay legible at small sizes.
+// Ramp: #2c2e3a · #41465e · #595e7a · #6c7296 · #777fa8 · #959fbf · #abb6ce · #c9d1e0 · #dfe6f5
 export const TOOLS: Tool[] = [
-  { id: "claude", label: "Claude", body: "#D97757", dark: "#A94F35", eye: "#FFE7CC" },
-  { id: "codex", label: "Codex", body: "#10A37F", dark: "#0B6B52", eye: "#B6F3DE" },
-  { id: "gemini", label: "Gemini CLI", body: "#4285F4", dark: "#2B5AB0", eye: "#D2E3FF" },
-  { id: "cursor", label: "Cursor", body: "#3B3F46", dark: "#17191D", eye: "#C7CBD1" },
-  { id: "copilot", label: "Copilot CLI", body: "#6E40C9", dark: "#4A2A8C", eye: "#DCC9F7" },
-  { id: "kimi", label: "Kimi CLI", body: "#0EA5E9", dark: "#0A6FA0", eye: "#C4ECFF" },
-  { id: "opencode", label: "opencode", body: "#F59E0B", dark: "#B45309", eye: "#FDE9BE" },
-  { id: "kilo", label: "Kilo Code", body: "#8B5CF6", dark: "#5E3AB0", eye: "#DED0FB" },
-  { id: "cline", label: "Cline", body: "#22C55E", dark: "#158040", eye: "#BDF0CF" },
-  { id: "antigravity", label: "Antigravity", body: "#6366F1", dark: "#3F41B0", eye: "#CFD1FB" },
+  { id: "claude",      label: "Claude",       body: "#595e7a", dark: "#2c2e3a", eye: "#dfe6f5" },
+  { id: "codex",       label: "Codex",        body: "#6c7296", dark: "#41465e", eye: "#dfe6f5" },
+  { id: "gemini",      label: "Gemini CLI",   body: "#777fa8", dark: "#41465e", eye: "#dfe6f5" },
+  { id: "cursor",      label: "Cursor",       body: "#41465e", dark: "#2c2e3a", eye: "#c9d1e0" },
+  { id: "copilot",     label: "Copilot CLI",  body: "#959fbf", dark: "#595e7a", eye: "#dfe6f5" },
+  { id: "kimi",        label: "Kimi CLI",     body: "#abb6ce", dark: "#6c7296", eye: "#dfe6f5" },
+  { id: "opencode",    label: "opencode",     body: "#595e7a", dark: "#2c2e3a", eye: "#abb6ce" },
+  { id: "kilo",        label: "Kilo Code",    body: "#6c7296", dark: "#2c2e3a", eye: "#c9d1e0" },
+  { id: "cline",       label: "Cline",        body: "#777fa8", dark: "#595e7a", eye: "#dfe6f5" },
+  { id: "antigravity", label: "Antigravity",  body: "#959fbf", dark: "#41465e", eye: "#dfe6f5" },
 ];
 
-export const human: Tool = { id: "human", label: "You", body: "#64748B", dark: "#3E4753", eye: "#E2E8F0", grid: HUMAN };
+export const human: Tool = { id: "human", label: "You", body: "#abb6ce", dark: "#595e7a", eye: "#dfe6f5", grid: HUMAN };
 
 export const TOOL_MAP: Record<string, Tool> = Object.fromEntries(
   [...TOOLS, human].map((t) => [t.id, t]),
@@ -73,7 +76,7 @@ export function PixelSprite({ tool, size = 48 }: { tool: string; size?: number }
   const grid = t.grid ?? ROBOT;
   const fill = (c: string) => (c === "X" ? t.body : c === "o" ? t.dark : c === "e" ? t.eye : null);
   return (
-    <svg width={size} height={size} viewBox="0 0 12 12" shapeRendering="crispEdges" aria-label={t.label}>
+    <svg width={size} height={size} viewBox="0 0 12 12" shapeRendering="crispEdges" aria-label={t.label} className="dark:invert dark:hue-rotate-180">
       {grid.flatMap((row, y) =>
         [...row].map((ch, x) => {
           const f = fill(ch);

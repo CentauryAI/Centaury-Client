@@ -1,9 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { IconButton } from "@/components/centaury";
 import { Minus, Maximize2, Minimize2, X } from "lucide-react";
 
 // Custom draggable titlebar for the frameless window (decorations:false).
 // Ported from desktop-legacy title-bar.tsx (owner asked to match it).
+// Outside Tauri (`pnpm dev` opened in a browser, used to preview the UI in demo
+// mode) there is no window to control: the buttons are not drawn.
+const inTauri = isTauri();
+
 interface TitleBarProps {
   title?: string;
   showMinimize?: boolean;
@@ -22,7 +28,7 @@ export function TitleBar({
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (!showMaximize) return;
+    if (!showMaximize || !inTauri) return;
     const win = getCurrentWebviewWindow();
     win.isMaximized().then(setIsMaximized);
     const unlisten = win.onResized(async () => setIsMaximized(await win.isMaximized()));
@@ -32,44 +38,42 @@ export function TitleBar({
   const win = () => getCurrentWebviewWindow();
 
   return (
-    <div className="flex h-8 shrink-0 select-none items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="flex h-10 shrink-0 select-none items-center justify-between bg-ground-app px-3">
       <div
         data-tauri-drag-region
-        onDoubleClick={() => showMaximize && win().toggleMaximize()}
-        className="flex grow items-center gap-2 pl-3"
+        onDoubleClick={() => showMaximize && inTauri && win().toggleMaximize()}
+        className="flex h-full grow items-center pl-1"
       >
-        {title && <span className="text-sm font-medium text-muted-foreground">{title}</span>}
+        {title && <span data-tauri-drag-region className="font-heading text-sm font-semibold tracking-tight text-foreground">{title}</span>}
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         {rightActions}
-        {rightActions && (showMinimize || showMaximize || showClose) && (
-          <div className="mx-1 h-4 w-px bg-border/40" />
+        {rightActions && inTauri && (showMinimize || showMaximize || showClose) && (
+          <div className="mx-1 h-4 w-px bg-foreground/15" />
         )}
-        {showMinimize && (
-          <button onClick={() => win().minimize()} className="title-bar-control" aria-label="Minimize" tabIndex={-1}>
+        {inTauri && showMinimize && (
+          <IconButton onClick={() => win().minimize()} label="Minimize" tabIndex={-1}>
             <Minus className="h-4 w-4" />
-          </button>
+          </IconButton>
         )}
-        {showMaximize && (
-          <button
+        {inTauri && showMaximize && (
+          <IconButton
             onClick={() => win().toggleMaximize()}
-            className="title-bar-control"
-            aria-label={isMaximized ? "Restore" : "Maximize"}
+            label={isMaximized ? "Restore" : "Maximize"}
             tabIndex={-1}
           >
             {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </button>
+          </IconButton>
         )}
-        {showClose && (
-          <button
+        {inTauri && showClose && (
+          <IconButton
             onClick={() => win().close()}
-            className="title-bar-control hover:bg-destructive hover:text-destructive-foreground"
-            aria-label="Close"
+            label="Close"
             tabIndex={-1}
           >
             <X className="h-4 w-4" />
-          </button>
+          </IconButton>
         )}
       </div>
     </div>

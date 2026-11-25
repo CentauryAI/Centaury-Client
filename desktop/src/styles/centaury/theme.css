@@ -1,0 +1,137 @@
+/* Tokens → Tailwind utilities (bg-primary, text-muted-foreground…) and the
+ * base shared by the three brands. What changes per brand lives in brands.css. */
+
+/* `dark:` only activates with an explicit .dark class (there is no dark mode);
+ * without this the dark variants in ui/* would follow the operating system. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-glow-b: var(--glow-b);
+  --color-glow-c: var(--glow-c);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-navbar: var(--navbar);
+  --color-navbar-foreground: var(--navbar-foreground);
+  --color-navbar-muted-foreground: var(--navbar-muted-foreground);
+  --color-navbar-border: var(--navbar-border);
+  --color-navbar-accent: var(--navbar-accent);
+  --color-navbar-accent-foreground: var(--navbar-accent-foreground);
+  --color-navbar-secondary: var(--navbar-secondary);
+  --color-navbar-secondary-foreground: var(--navbar-secondary-foreground);
+  --color-navbar-secondary-border: var(--navbar-secondary-border);
+  --color-navbar-icon: var(--navbar-icon);
+  --color-navbar-action: var(--navbar-action);
+  --color-navbar-action-foreground: var(--navbar-action-foreground);
+  --color-footer: var(--footer);
+  --color-footer-foreground: var(--footer-foreground);
+  --color-footer-muted-foreground: var(--footer-muted-foreground);
+  --color-footer-border: var(--footer-border);
+  --color-footer-copyright: var(--footer-copyright);
+  --color-ground-app: var(--ground-app);
+  --color-ground-auth: var(--ground-auth);
+  --color-status-ok: var(--status-ok);
+  --color-status-pending: var(--status-pending);
+
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+  --font-mono: var(--font-mono-family);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* House base: white ground, slate ink (never #000), cool hairlines. */
+:root {
+  --background: #ffffff;
+  --foreground: #2c2e3a;
+  --card: #ffffff;
+  --card-foreground: #2c2e3a;
+  --popover: #ffffff;
+  --popover-foreground: #2c2e3a;
+  --secondary: #eef1f6;
+  --secondary-foreground: #2c2e3a;
+  --muted: #f6f7fa;
+  --muted-foreground: #61688c; /* 5.43:1 on white (AA) */
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e6e9f1;
+  --input: #e6e9f1;
+  --radius: 0.625rem;
+
+  --sidebar: #f4f6f9;
+  --sidebar-foreground: #2c2e3a;
+  --sidebar-primary-foreground: #f4f6f9;
+  --sidebar-accent: #dae1eb;
+  --sidebar-accent-foreground: #2c2e3a;
+  --sidebar-border: #c4cedd;
+
+  /* Dark surfaces (navbar, footer, bands) */
+  --navbar: #2c2e3a;
+  --navbar-foreground: #ebeff4;
+  --navbar-muted-foreground: #abb6ce; /* 6.6:1 on #2c2e3a, 5.6:1 on the bar at 95% over white */
+  --navbar-border: #595e7a;
+  --navbar-accent: #595e7a;
+  --navbar-accent-foreground: #ebeff4;
+  --navbar-secondary: #4b5064;
+  --navbar-secondary-foreground: #ebeff4;
+  --navbar-secondary-border: #6c7296;
+  --navbar-icon: #abb6ce;
+  /* The one filled button on the bar: the brand colour, unless the brand is
+     too dark to show on the bar (studio). */
+  --navbar-action: var(--primary);
+  --navbar-action-foreground: var(--primary-foreground);
+  --footer: #2c2e3a;
+  --footer-foreground: #ebeff4;
+  --footer-muted-foreground: #959fbf;
+  --footer-border: #595e7a;
+  --footer-copyright: #959fbf; /* 5.12:1 on #2c2e3a */
+  --band-lit: #3a3d50;
+  --band: #2c2e3a;
+  --band-deep: #1f2130;
+
+  /* App grounds */
+  --ground-app: #e7eaf2;
+  --ground-auth: #f2f4f8;
+
+  /* The only non-slate colors allowed: status dots, semantic */
+  --status-ok: #22c55e;
+  --status-pending: #f59e0b;
+
+  /* web/ renders `font-mono` with the body font (its mono variable does not
+   * exist), and that is the approved look. For a real monospace, change this
+   * line to `ui-monospace, "SF Mono", Menlo, Consolas, monospace`. */
+  --font-mono-family: var(--font-body);
+}
