@@ -105,7 +105,7 @@ export function CollabCanvas({ roster, traffic = [], ambient = false, broadcastN
 
         {/* kore core */}
         <div className="absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md bg-primary font-mono text-lg font-bold text-primary-foreground shadow-lg" style={{ left: `${CENTER.x}%`, top: `${CENTER.y}%` }}>
-          K
+          C
         </div>
 
         {/* nodes */}

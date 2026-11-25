@@ -2,9 +2,12 @@
 #   1. Build centaury (centaury binary) for every supported target
 #      (linux musl static, macOS arm64/x86_64, windows x86_64)
 #   2. Create a GitHub Release with the compiled binaries
+#   3. Build + sign the desktop app (Tauri) for linux/macOS arm64+x86_64/windows,
+#      attach installers + updater bundles + latest.json to the same release
+#      and publish latest.json as desktop/latest.json on main (updater endpoint)
 #
-# `workflow_dispatch` = dry-run build: compiles all targets, skips the
-# release step — use it to verify the matrix before tagging.
+# `workflow_dispatch` = dry-run build: compiles all targets (CLI + desktop),
+# skips the release/publish steps — use it to verify the matrix before tagging.
 #
 # One-time manual setup:
 #   - Ensure the repo has the RELEASE_TOKEN secret if you want to publish
@@ -120,3 +123,181 @@ jobs:
 
           Already installed? \`centaury update\`" \
             dist/*
+
+  # ---- Desktop app (Tauri) ------------------------------------------------
+  # Runs after the CLI release so the CLI `release` job (download-all-artifacts
+  # → dist/*) never picks up desktop bundles. On workflow_dispatch the CLI
+  # release is skipped and this still runs = desktop dry-run build.
+  #
+  # Secrets (repo → Settings → Secrets → Actions):
+  #   TAURI_SIGNING_PRIVATE_KEY           minisign key content (or path) matching
+  #                                       plugins.updater.pubkey in tauri.conf.json
+  #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password ("" if none)
+  # macOS bundles are not codesigned/notarized (no Apple cert configured).
+  desktop:
+    name: Desktop ${{ matrix.platform }}
+    needs: release
+    if: ${{ !failure() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04 # oldest glibc we ship the AppImage against
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x86_64
+            arch: x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: darwin-aarch64
+            arch: aarch64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: darwin-x86_64
+            arch: x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows-x86_64
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux / Tauri)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libxdo-dev \
+            build-essential \
+            file \
+            patchelf
+
+      - name: Install toolchain
+        shell: bash
+        run: |
+          rustup update stable && rustup default stable
+          rustup target add "${{ matrix.target }}"
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: desktop-${{ matrix.target }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        working-directory: desktop
+        run: pnpm install --frozen-lockfile
+
+      # beforeBuildCommand runs scripts/sidecar.sh (stages the centaury CLI for
+      # this target) + pnpm build. createUpdaterArtifacts + the signing env
+      # make tauri emit the updater bundle and its .sig.
+      - name: Build & sign bundles
+        working-directory: desktop
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build --target "${{ matrix.target }}"
+
+      # Collect installers + updater bundles (+ .sig). desktop/src-tauri is a
+      # workspace member → cargo writes to the root target/. Both mac runners
+      # emit the same Centaury.app.tar.gz name, so the arch is appended
+      # (renaming doesn't touch the signature: it covers content, not name).
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          shopt -s nullglob
+          B="target/${{ matrix.target }}/release/bundle"
+          mkdir -p out
+          for f in "$B"/appimage/*.AppImage "$B"/appimage/*.AppImage.sig \
+                   "$B"/deb/*.deb "$B"/rpm/*.rpm "$B"/dmg/*.dmg \
+                   "$B"/nsis/*-setup.exe "$B"/nsis/*-setup.exe.sig \
+                   "$B"/msi/*.msi "$B"/msi/*.msi.sig; do
+            cp "$f" out/
+          done
+          for f in "$B"/macos/*.app.tar.gz "$B"/macos/*.app.tar.gz.sig; do
+            n=$(basename "$f")
+            cp "$f" "out/${n/.app.tar.gz/_${{ matrix.arch }}.app.tar.gz}"
+          done
+          ls -la out
+          ls out/*.sig >/dev/null || { echo "no updater .sig produced — is TAURI_SIGNING_PRIVATE_KEY set?"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: out/*
+          if-no-files-found: error
+
+  desktop-release:
+    name: Publish desktop + latest.json
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches tauri.conf.json version
+        run: |
+          V=$(jq -r .version desktop/src-tauri/tauri.conf.json)
+          [ "v$V" = "${GITHUB_REF_NAME}" ] || {
+            echo "tag ${GITHUB_REF_NAME} != desktop/src-tauri/tauri.conf.json v$V — bump the app first"
+            exit 1
+          }
+
+      # One dir per runner (desktop-<os>-<arch>/): latest-json.mjs takes the
+      # platform key from the dir name.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: desktop-dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate latest.json
+        run: |
+          node desktop/scripts/latest-json.mjs \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}" \
+            --notes "Centaury ${GITHUB_REF_NAME} — https://github.com/${{ github.repository }}/releases/tag/${GITHUB_REF_NAME}" \
+            --out latest.json \
+            desktop-dist
+          cat latest.json
+
+      - name: Attach bundles + latest.json to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            --repo "${{ github.repository }}" --clobber \
+            desktop-dist/*/* latest.json
+
+      # The app's updater endpoint is the raw desktop/latest.json on main (not
+      # releases/latest/download, which a later CLI-only release would shadow),
+      # so publish the manifest there too.
+      - name: Publish updater endpoint (desktop/latest.json on main)
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          cp latest.json desktop/latest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/latest.json
+          git commit -m "desktop: latest.json for ${GITHUB_REF_NAME}" || { echo "latest.json unchanged"; exit 0; }
+          git push origin main

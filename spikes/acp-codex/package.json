@@ -1,0 +1,6 @@
+{
+  "name": "acp-codex-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@agentclientprotocol/codex-acp": "2.7.0" }
+}

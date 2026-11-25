@@ -1,8 +1,8 @@
 [package]
 name = "centaury-desktop"
 version = "0.1.0"
-description = "Kore desktop app — GUI centaury"
-authors = ["Kore"]
+description = "Centaury desktop app — GUI centaury"
+authors = ["Centaury"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
